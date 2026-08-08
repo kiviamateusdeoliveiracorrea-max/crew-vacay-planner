@@ -246,17 +246,43 @@ export function FeriasFormDialog({
           </div>
 
           {previa.length > 0 && (
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
-              <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
-                Prévia de conflitos
-              </p>
-              <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-muted-foreground">
-                {previa.map((p, i) => (
-                  <li key={i}>{p}</li>
+            <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+              <p className="text-xs font-medium">Prévia de conflitos ({previa.length})</p>
+              <ul className="space-y-2">
+                {previa.map((a, i) => (
+                  <li key={i} className="rounded-md border border-border bg-background p-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${severidadeClasse(a.severidade)}`}
+                      >
+                        {SEVERIDADE_LABEL[a.severidade]}
+                      </span>
+                      <span className="text-[10px] text-muted-foreground">{humaniza(a.regra)}</span>
+                      {a.overlap && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {fmtData(a.overlap.inicio)} a {fmtData(a.overlap.fim)}
+                          {a.dias ? ` · ${a.dias} dia(s)` : ""}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-1 text-xs">{a.mensagem}</p>
+                    <p className="text-[11px] text-muted-foreground">Ação: {a.acao}</p>
+                    {a.envolvidos.length > 0 && (
+                      <p className="text-[11px] text-muted-foreground">
+                        {a.envolvidos
+                          .map(
+                            (e) =>
+                              `${e.nome} (RE ${e.re ?? "—"}) · ${e.funcao ?? "—"} · ${e.area ?? "—"} · ${e.turno ?? "—"}`,
+                          )
+                          .join(" | ")}
+                      </p>
+                    )}
+                  </li>
                 ))}
               </ul>
             </div>
           )}
+
         </div>
 
         <DialogFooter>
