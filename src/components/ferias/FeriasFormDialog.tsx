@@ -39,6 +39,10 @@ export function FeriasFormDialog({
   registro,
   employees,
   funcoes,
+  areas,
+  turnos,
+  movimentacoes,
+  regras,
   ferias,
   nomeArea,
 }: {
@@ -47,9 +51,14 @@ export function FeriasFormDialog({
   registro: VacationFull | null;
   employees: Employee[];
   funcoes: Funcao[];
+  areas: Area[];
+  turnos: Turno[];
+  movimentacoes: MovementFull[];
+  regras: CoverageRule[];
   ferias: VacationFull[];
   nomeArea: (id: string | null) => string;
 }) {
+
   const salvar = useSalvarFerias();
   const [employeeId, setEmployeeId] = useState("");
   const [inicio, setInicio] = useState("");
