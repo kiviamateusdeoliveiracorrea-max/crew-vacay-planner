@@ -19,9 +19,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { useSalvarFerias, type VacationFull } from "@/hooks/useSistema";
-import type { Employee, Funcao, Vacation } from "@/lib/sistema";
-import { humaniza, sobrepoe } from "@/lib/sistema";
+import { useSalvarFerias, type VacationFull, type MovementFull } from "@/hooks/useSistema";
+import type { Area, CoverageRule, Employee, Funcao, Turno, Vacation } from "@/lib/sistema";
+import { fmtData, humaniza, severidadeClasse, SEVERIDADE_LABEL } from "@/lib/sistema";
+import { avaliarFerias } from "@/lib/motor-conflitos";
+
 
 const STATUS: Vacation["status"][] = [
   "PLANEJADA",
