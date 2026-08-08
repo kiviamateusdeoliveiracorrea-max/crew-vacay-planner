@@ -137,16 +137,22 @@ export function MovimentacaoDialog({
     );
   }, [colaborador, movimentacoes, temporaria, dataEfetiva, dataFim, registro?.id]);
 
+  const areaOrigem = registro?.area_origem_id ?? vigente?.areaId ?? colaborador?.area_id ?? null;
+  const turnoOrigem = registro?.shift_origem_id ?? vigente?.shiftId ?? colaborador?.shift_id ?? null;
+
   const erros = useMemo(
     () =>
       validaMovimentacao({
         tipo,
         areaDestinoId: areaDestino || null,
+        areaOrigemId: areaOrigem,
+        shiftOrigemId: turnoOrigem,
+        shiftDestinoId: turnoDestino || null,
         dataEfetiva,
         temporaria,
         dataFim: dataFim || null,
       }),
-    [tipo, areaDestino, dataEfetiva, temporaria, dataFim],
+    [tipo, areaDestino, areaOrigem, turnoOrigem, turnoDestino, dataEfetiva, temporaria, dataFim],
   );
 
   const conflitaFerias = useMemo(() => {
@@ -166,6 +172,9 @@ export function MovimentacaoDialog({
     const form = normalizaPorTipo({
       tipo,
       areaDestinoId: areaDestino || null,
+      areaOrigemId: areaOrigem,
+      shiftOrigemId: turnoOrigem,
+      shiftDestinoId: turnoDestino || null,
       dataEfetiva,
       temporaria,
       dataFim: dataFim || null,
@@ -185,16 +194,17 @@ export function MovimentacaoDialog({
         employee_id: colaborador.id,
         re: colaborador.re ?? "",
         // origem = lotação vigente na data efetiva (o banco recalcula se vier nula)
-        area_origem_id: registro?.area_origem_id ?? vigente?.areaId ?? colaborador.area_id,
-        shift_origem_id: registro?.shift_origem_id ?? vigente?.shiftId ?? colaborador.shift_id,
+        area_origem_id: areaOrigem,
+        shift_origem_id: turnoOrigem,
         area_destino_id: form.areaDestinoId,
-        shift_destino_id: turnoDestino || colaborador.shift_id,
+        shift_destino_id: turnoDestino || turnoOrigem,
         data_efetiva: form.dataEfetiva,
         tipo: form.tipo,
         temporaria: form.temporaria,
         data_fim: form.dataFim,
         motivo: motivo || null,
         observacao: observacao || null,
+        status,
       } as never);
       toast.success("Movimentação registrada. Conflitos recalculados.");
       onOpenChange(false);
@@ -202,6 +212,8 @@ export function MovimentacaoDialog({
       toast.error(e instanceof Error ? e.message : "Não foi possível salvar.");
     }
   }
+
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
