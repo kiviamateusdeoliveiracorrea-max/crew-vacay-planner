@@ -74,10 +74,19 @@ export function lotacaoVigente(
 }
 
 /** Empréstimo/cobertura aprovado que ainda cobre a data informada. */
-export function temporariaAberta(movs: Mov[], employeeId: string, data: string) {
+export function temporariaAberta<T extends Mov>(
+  movs: T[],
+  employeeId: string,
+  data: string,
+): T | null {
   return (
-    aprovadas(movs, employeeId).find(
-      (m) => m.temporaria && m.data_efetiva <= data && (m.data_fim ?? "9999-12-31") >= data,
+    movs.find(
+      (m) =>
+        m.employee_id === employeeId &&
+        m.status === "APROVADA" &&
+        m.temporaria &&
+        m.data_efetiva <= data &&
+        (m.data_fim ?? "9999-12-31") >= data,
     ) ?? null
   );
 }
