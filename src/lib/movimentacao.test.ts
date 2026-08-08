@@ -132,7 +132,7 @@ describe("movimentação temporária", () => {
     ).toContain("Movimentação temporária exige data final.");
   });
 
-  it("recusa data final anterior à data efetiva", () => {
+  it("recusa data final anterior ou igual à data efetiva", () => {
     expect(
       validaMovimentacao({
         tipo: "COBERTURA_DE_FERIAS",
@@ -141,8 +141,45 @@ describe("movimentação temporária", () => {
         temporaria: true,
         dataFim: "2026-04-01",
       }),
-    ).toContain("A data final não pode ser anterior à data efetiva.");
+    ).toContain("A data final deve ser posterior à data efetiva.");
+    expect(
+      validaMovimentacao({
+        tipo: "COBERTURA_DE_FERIAS",
+        areaDestinoId: "CEM",
+        dataEfetiva: "2026-04-10",
+        temporaria: true,
+        dataFim: "2026-04-10",
+      }),
+    ).toContain("A data final deve ser posterior à data efetiva.");
   });
+
+  it("recusa origem igual ao destino", () => {
+    expect(
+      validaMovimentacao({
+        tipo: "TRANSFERENCIA_DEFINITIVA",
+        areaDestinoId: "CEM",
+        areaOrigemId: "CEM",
+        shiftOrigemId: "T1",
+        shiftDestinoId: "T1",
+        dataEfetiva: "2026-04-10",
+        temporaria: false,
+        dataFim: null,
+      }),
+    ).toContain("Origem e destino não podem ser iguais (mesmo setor e turno).");
+    expect(
+      validaMovimentacao({
+        tipo: "TROCA_DE_TURNO",
+        areaDestinoId: "CEM",
+        areaOrigemId: "CEM",
+        shiftOrigemId: "T1",
+        shiftDestinoId: "T2",
+        dataEfetiva: "2026-04-10",
+        temporaria: false,
+        dataFim: null,
+      }),
+    ).toHaveLength(0);
+  });
+
 
   it("detecta sobreposição com outra temporária aprovada", () => {
     const nova = { inicio: "2026-04-20", fim: "2026-05-10" };
