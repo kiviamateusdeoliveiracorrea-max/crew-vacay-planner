@@ -183,6 +183,7 @@ function MovimentacoesPage() {
         employees={emp.data ?? []}
         areas={areas}
         turnos={turnos}
+        movimentacoes={mov.data ?? []}
         feriasDoColaborador={feriasDoColaborador}
       />
     </AppShell>
