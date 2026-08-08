@@ -20,7 +20,7 @@ import { fmtData, humaniza } from "@/lib/sistema";
 
 export const Route = createFileRoute("/movimentacoes")({
   validateSearch: (search: Record<string, unknown>) => ({
-    registro: typeof search.registro === "string" ? search.registro : undefined,
+    registro: typeof search['registro'] === "string" ? (search['registro'] as string) : undefined,
   }),
   head: () => ({
     meta: [
