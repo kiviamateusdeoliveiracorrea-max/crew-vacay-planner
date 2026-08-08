@@ -127,45 +127,6 @@ export type Database = {
         }
         Relationships: []
       }
-      colaboradores: {
-        Row: {
-          area: string
-          ativo: boolean
-          created_at: string
-          funcao: string
-          funcao_chave: boolean
-          id: string
-          lider: string | null
-          nome: string
-          re: string | null
-          turno: string | null
-        }
-        Insert: {
-          area: string
-          ativo?: boolean
-          created_at?: string
-          funcao: string
-          funcao_chave?: boolean
-          id?: string
-          lider?: string | null
-          nome: string
-          re?: string | null
-          turno?: string | null
-        }
-        Update: {
-          area?: string
-          ativo?: boolean
-          created_at?: string
-          funcao?: string
-          funcao_chave?: boolean
-          id?: string
-          lider?: string | null
-          nome?: string
-          re?: string | null
-          turno?: string | null
-        }
-        Relationships: []
-      }
       coverage_rules: {
         Row: {
           area_id: string | null
@@ -399,47 +360,6 @@ export type Database = {
             columns: ["shift_id"]
             isOneToOne: false
             referencedRelation: "shifts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      ferias: {
-        Row: {
-          colaborador_id: string
-          created_at: string
-          fim: string
-          id: string
-          inicio: string
-          observacao: string | null
-          status: string
-          substituto: string | null
-        }
-        Insert: {
-          colaborador_id: string
-          created_at?: string
-          fim: string
-          id?: string
-          inicio: string
-          observacao?: string | null
-          status?: string
-          substituto?: string | null
-        }
-        Update: {
-          colaborador_id?: string
-          created_at?: string
-          fim?: string
-          id?: string
-          inicio?: string
-          observacao?: string | null
-          status?: string
-          substituto?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "ferias_colaborador_id_fkey"
-            columns: ["colaborador_id"]
-            isOneToOne: false
-            referencedRelation: "colaboradores"
             referencedColumns: ["id"]
           },
         ]

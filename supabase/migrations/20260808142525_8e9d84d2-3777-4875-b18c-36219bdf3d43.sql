@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS public.ferias CASCADE;
+DROP TABLE IF EXISTS public.colaboradores CASCADE;
