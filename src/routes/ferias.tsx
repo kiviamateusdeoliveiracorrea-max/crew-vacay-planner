@@ -252,9 +252,14 @@ function FeriasPage() {
         registro={editando}
         employees={emp.data ?? []}
         funcoes={funcoes}
+        areas={areas}
+        turnos={turnos}
+        movimentacoes={mov.data ?? []}
+        regras={cat.data?.regras ?? []}
         ferias={fer.data ?? []}
         nomeArea={nomeArea}
       />
+
     </AppShell>
   );
 }
