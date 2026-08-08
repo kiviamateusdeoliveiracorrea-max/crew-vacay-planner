@@ -26,7 +26,7 @@ export function useSalvarFerias() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
-      id?: string;
+      id?: string | undefined;
       colaborador_id: string;
       inicio: string;
       fim: string;
