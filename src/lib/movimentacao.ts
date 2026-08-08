@@ -82,12 +82,12 @@ export function temporariaAberta(movs: Mov[], employeeId: string, data: string) 
   );
 }
 
-export function temporariaSobreposta(
-  movs: (Mov & { id: string })[],
+export function temporariaSobreposta<T extends Mov & { id: string }>(
+  movs: T[],
   employeeId: string,
   periodo: { inicio: string; fim: string },
   ignorarId?: string | undefined,
-) {
+): T | null {
   return (
     movs.find(
       (m) =>
