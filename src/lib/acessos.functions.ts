@@ -289,3 +289,107 @@ export const removerAcesso = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+/* ---------------- Solicitação de acesso ---------------- */
+
+export const areasParaSolicitacao = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    const db = await admin();
+    const { data } = await db
+      .from("areas")
+      .select("id, nome, unidade")
+      .eq("ativo", true)
+      .order("nome");
+    return (data ?? []).map((a) => ({ id: a.id, nome: a.nome, unidade: a.unidade }));
+  });
+
+export const minhaSolicitacaoAcesso = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const db = await admin();
+    const { data: authUser } = await db.auth.admin.getUserById(context.userId);
+    const { data } = await db
+      .from("access_requests")
+      .select("id, area_id, justificativa, status, created_at, decidido_em, resposta")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return {
+      email: authUser?.user?.email ?? null,
+      solicitacao: data ?? null,
+    };
+  });
+
+const solicitarSchema = z.object({
+  areaId: z.string().uuid().nullable(),
+  justificativa: z.string().trim().min(10).max(1000),
+});
+
+export const solicitarAcesso = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) => solicitarSchema.parse(d))
+  .handler(async ({ context, data }) => {
+    const db = await admin();
+
+    const { data: aberta } = await db
+      .from("access_requests")
+      .select("id")
+      .eq("user_id", context.userId)
+      .eq("status", "PENDENTE")
+      .maybeSingle();
+    if (aberta) throw new Error("Você já possui uma solicitação em aberto aguardando aprovação.");
+
+    const { data: papeis } = await db
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId);
+    if ((papeis ?? []).length) throw new Error("Sua conta já possui perfil de acesso.");
+
+    const { data: authUser } = await db.auth.admin.getUserById(context.userId);
+    const email = authUser?.user?.email ?? null;
+
+    const { data: criada, error } = await db
+      .from("access_requests")
+      .insert({
+        user_id: context.userId,
+        email,
+        area_id: data.areaId,
+        justificativa: data.justificativa,
+        status: "PENDENTE",
+      })
+      .select("id, created_at")
+      .single();
+    if (error) throw error;
+
+    // Notificar administradores
+    const { data: admins } = await db.from("user_roles").select("user_id").eq("role", "ADMIN");
+    const ids = (admins ?? []).map((a) => a.user_id);
+    let emailsAdmins: string[] = [];
+    if (ids.length) {
+      const { data: perfisAdmin } = await db
+        .from("profiles")
+        .select("email")
+        .in("id", ids)
+        .eq("ativo", true);
+      emailsAdmins = (perfisAdmin ?? []).map((p) => p.email).filter((e): e is string => !!e);
+    }
+
+    await auditar(
+      "SOLICITACAO_ACESSO",
+      criada.id,
+      context.userId,
+      null,
+      {
+        email,
+        area_id: data.areaId,
+        justificativa: data.justificativa,
+        status: "PENDENTE",
+        administradores_notificados: emailsAdmins,
+      },
+      "Solicitação de liberação de acesso enviada para aprovação.",
+    );
+
+    return { ok: true, id: criada.id, criadoEm: criada.created_at, administradores: emailsAdmins.length };
+  });
