@@ -22,7 +22,17 @@ import {
 import { toast } from "sonner";
 import { useSalvarMovimentacao, type MovementFull } from "@/hooks/useSistema";
 import type { Area, Employee, Movement, Turno } from "@/lib/sistema";
-import { humaniza, sobrepoe, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
+import { fmtData, humaniza, sobrepoe, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
+import {
+  ehDefinitivo,
+  ehTemporario,
+  lotacaoDefinitiva,
+  lotacaoVigente,
+  normalizaPorTipo,
+  temporariaAberta,
+  temporariaSobreposta,
+  validaMovimentacao,
+} from "@/lib/movimentacao";
 
 export function MovimentacaoDialog({
   open,
@@ -31,6 +41,7 @@ export function MovimentacaoDialog({
   employees,
   areas,
   turnos,
+  movimentacoes,
   feriasDoColaborador,
 }: {
   open: boolean;
@@ -39,6 +50,7 @@ export function MovimentacaoDialog({
   employees: Employee[];
   areas: Area[];
   turnos: Turno[];
+  movimentacoes: MovementFull[];
   feriasDoColaborador: (employeeId: string) => { inicio: string; fim: string }[];
 }) {
   const salvar = useSalvarMovimentacao();
@@ -68,6 +80,7 @@ export function MovimentacaoDialog({
   }, [open, registro]);
 
   const colaborador = employees.find((e) => e.id === employeeId) ?? null;
+  const tipoTravado = ehDefinitivo(tipo) || ehTemporario(tipo);
 
   const opcoes = useMemo(() => {
     const termo = busca.trim().toLowerCase();
@@ -78,27 +91,89 @@ export function MovimentacaoDialog({
       .slice(0, 60);
   }, [employees, busca]);
 
+  // Espelha a normalização do banco: definitiva nunca temporária, empréstimo sempre.
   useEffect(() => {
-    if (tipo === "TRANSFERENCIA_DEFINITIVA" || tipo === "RETORNO_A_ORIGEM") setTemporaria(false);
-    if (tipo === "EMPRESTIMO_TEMPORARIO" || tipo === "COBERTURA_DE_FERIAS") setTemporaria(true);
+    if (ehDefinitivo(tipo)) {
+      setTemporaria(false);
+      setDataFim("");
+    }
+    if (ehTemporario(tipo)) setTemporaria(true);
   }, [tipo]);
 
-  const aviso = useMemo(() => {
-    if (!employeeId || !dataEfetiva) return null;
+  const referencia = dataEfetiva || new Date().toISOString().slice(0, 10);
+
+  const vigente = useMemo(
+    () => (colaborador ? lotacaoVigente(movimentacoes, colaborador, referencia) : null),
+    [colaborador, movimentacoes, referencia],
+  );
+  const definitiva = useMemo(
+    () => (colaborador ? lotacaoDefinitiva(movimentacoes, colaborador, referencia) : null),
+    [colaborador, movimentacoes, referencia],
+  );
+
+  // Retorno à origem: destino é sempre a lotação permanente.
+  useEffect(() => {
+    if (tipo === "RETORNO_A_ORIGEM" && definitiva?.areaId) {
+      setAreaDestino(definitiva.areaId);
+      setTurnoDestino(definitiva.shiftId ?? "");
+    }
+  }, [tipo, definitiva?.areaId, definitiva?.shiftId]);
+
+  const emprestimoAberto = useMemo(
+    () => (colaborador ? temporariaAberta(movimentacoes, colaborador.id, referencia) : null),
+    [colaborador, movimentacoes, referencia],
+  );
+
+  const sobreposta = useMemo(() => {
+    if (!colaborador || !temporaria || !dataEfetiva) return null;
+    return temporariaSobreposta(
+      movimentacoes,
+      colaborador.id,
+      { inicio: dataEfetiva, fim: dataFim || dataEfetiva },
+      registro?.id,
+    );
+  }, [colaborador, movimentacoes, temporaria, dataEfetiva, dataFim, registro?.id]);
+
+  const erros = useMemo(
+    () =>
+      validaMovimentacao({
+        tipo,
+        areaDestinoId: areaDestino || null,
+        dataEfetiva,
+        temporaria,
+        dataFim: dataFim || null,
+      }),
+    [tipo, areaDestino, dataEfetiva, temporaria, dataFim],
+  );
+
+  const conflitaFerias = useMemo(() => {
+    if (!employeeId || !dataEfetiva) return false;
     const periodo = { inicio: dataEfetiva, fim: temporaria && dataFim ? dataFim : dataEfetiva };
-    const conflita = feriasDoColaborador(employeeId).some((f) => sobrepoe(f, periodo));
-    return conflita
-      ? "Este colaborador possui férias no período da movimentação — será gerado alerta crítico."
-      : null;
+    return feriasDoColaborador(employeeId).some((f) => sobrepoe(f, periodo));
   }, [employeeId, dataEfetiva, dataFim, temporaria, feriasDoColaborador]);
 
+  const nomeArea = (id: string | null) => areas.find((a) => a.id === id)?.nome ?? "—";
+  const nomeTurno = (id: string | null) => turnos.find((t) => t.id === id)?.nome ?? "—";
+
   async function submeter() {
-    if (!colaborador || !dataEfetiva || !areaDestino) {
-      toast.error("Informe colaborador, área de destino e data efetiva.");
+    if (!colaborador) {
+      toast.error("Selecione o colaborador.");
       return;
     }
-    if (temporaria && !dataFim) {
-      toast.error("Movimentação temporária exige data final.");
+    const form = normalizaPorTipo({
+      tipo,
+      areaDestinoId: areaDestino || null,
+      dataEfetiva,
+      temporaria,
+      dataFim: dataFim || null,
+    });
+    const problemas = validaMovimentacao(form);
+    if (problemas.length > 0) {
+      toast.error(problemas[0]!);
+      return;
+    }
+    if (sobreposta) {
+      toast.error("Já existe movimentação temporária aprovada sobreposta para este colaborador.");
       return;
     }
     try {
@@ -106,14 +181,15 @@ export function MovimentacaoDialog({
         ...(registro?.id ? { id: registro.id } : {}),
         employee_id: colaborador.id,
         re: colaborador.re ?? "",
-        area_origem_id: registro?.area_origem_id ?? colaborador.area_id,
-        shift_origem_id: registro?.shift_origem_id ?? colaborador.shift_id,
-        area_destino_id: areaDestino,
+        // origem = lotação vigente na data efetiva (o banco recalcula se vier nula)
+        area_origem_id: registro?.area_origem_id ?? vigente?.areaId ?? colaborador.area_id,
+        shift_origem_id: registro?.shift_origem_id ?? vigente?.shiftId ?? colaborador.shift_id,
+        area_destino_id: form.areaDestinoId,
         shift_destino_id: turnoDestino || colaborador.shift_id,
-        data_efetiva: dataEfetiva,
-        tipo,
-        temporaria,
-        data_fim: temporaria ? dataFim : null,
+        data_efetiva: form.dataEfetiva,
+        tipo: form.tipo,
+        temporaria: form.temporaria,
+        data_fim: form.dataFim,
         motivo: motivo || null,
         observacao: observacao || null,
       } as never);
@@ -123,9 +199,6 @@ export function MovimentacaoDialog({
       toast.error(e instanceof Error ? e.message : "Não foi possível salvar.");
     }
   }
-
-  const nomeArea = (id: string | null) => areas.find((a) => a.id === id)?.nome ?? "—";
-  const nomeTurno = (id: string | null) => turnos.find((t) => t.id === id)?.nome ?? "—";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -161,10 +234,22 @@ export function MovimentacaoDialog({
             </Select>
           </div>
 
-          {colaborador && (
-            <p className="text-xs text-muted-foreground">
-              Origem atual: {nomeArea(colaborador.area_id)} · {nomeTurno(colaborador.shift_id)}
-            </p>
+          {colaborador && vigente && definitiva && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+              <p>
+                Lotação vigente em {fmtData(referencia)}: <strong>{nomeArea(vigente.areaId)}</strong> ·{" "}
+                {nomeTurno(vigente.shiftId)}
+                {vigente.temporaria ? " (temporária)" : ""}
+              </p>
+              {vigente.temporaria && (
+                <p className="mt-1">
+                  Lotação permanente: {nomeArea(definitiva.areaId)} · {nomeTurno(definitiva.shiftId)}
+                  {emprestimoAberto?.data_fim
+                    ? ` · empréstimo até ${fmtData(emprestimoAberto.data_fim)}`
+                    : ""}
+                </p>
+              )}
+            </div>
           )}
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -185,7 +270,11 @@ export function MovimentacaoDialog({
             </div>
             <div className="space-y-1">
               <Label>Setor de destino</Label>
-              <Select value={areaDestino} onValueChange={setAreaDestino}>
+              <Select
+                value={areaDestino}
+                onValueChange={setAreaDestino}
+                disabled={tipo === "RETORNO_A_ORIGEM"}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
@@ -197,6 +286,11 @@ export function MovimentacaoDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {tipo === "RETORNO_A_ORIGEM" && (
+                <p className="text-[11px] text-muted-foreground">
+                  Destino fixado na lotação permanente do colaborador.
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>Turno de destino</Label>
@@ -219,8 +313,13 @@ export function MovimentacaoDialog({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 rounded-lg border border-border p-3">
-            <Switch checked={temporaria} onCheckedChange={setTemporaria} id="temp" />
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
+            <Switch
+              checked={temporaria}
+              onCheckedChange={setTemporaria}
+              id="temp"
+              disabled={tipoTravado}
+            />
             <Label htmlFor="temp" className="text-sm">
               Movimentação temporária
             </Label>
@@ -231,6 +330,13 @@ export function MovimentacaoDialog({
                 value={dataFim}
                 onChange={(e) => setDataFim(e.target.value)}
               />
+            )}
+            {tipoTravado && (
+              <p className="w-full text-[11px] text-muted-foreground">
+                {ehDefinitivo(tipo)
+                  ? "Este tipo altera a lotação de forma permanente a partir da data efetiva."
+                  : "Este tipo é sempre temporário e exige data final."}
+              </p>
             )}
           </div>
 
@@ -243,9 +349,30 @@ export function MovimentacaoDialog({
             <Textarea rows={2} value={observacao} onChange={(e) => setObservacao(e.target.value)} />
           </div>
 
-          {aviso && (
+          {tipo === "RETORNO_A_ORIGEM" && emprestimoAberto && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
+              Ao aprovar, o empréstimo vigente será encerrado no dia anterior ao retorno.
+            </div>
+          )}
+
+          {sobreposta && (
             <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
-              {aviso}
+              Conflito: já existe movimentação temporária aprovada de {fmtData(sobreposta.data_efetiva)} a{" "}
+              {fmtData(sobreposta.data_fim)} para este colaborador.
+            </div>
+          )}
+
+          {erros.length > 0 && (
+            <ul className="space-y-1 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-400">
+              {erros.map((e) => (
+                <li key={e}>{e}</li>
+              ))}
+            </ul>
+          )}
+
+          {conflitaFerias && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+              Este colaborador possui férias no período da movimentação — será gerado alerta crítico.
             </div>
           )}
         </div>
@@ -254,7 +381,7 @@ export function MovimentacaoDialog({
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={submeter} disabled={salvar.isPending}>
+          <Button onClick={submeter} disabled={salvar.isPending || erros.length > 0 || !!sobreposta}>
             Salvar
           </Button>
         </DialogFooter>
