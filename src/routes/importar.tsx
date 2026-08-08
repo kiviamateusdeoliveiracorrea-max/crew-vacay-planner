@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import { AppShell } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,16 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -54,6 +64,9 @@ export const Route = createFileRoute("/importar")({
 });
 
 const NENHUM = "__nenhum__";
+const hoje = () => new Date().toISOString().slice(0, 10);
+
+type DecisaoSetor = { tipo: "DEFINITIVA" | "TEMPORARIA"; fim: string };
 
 function ImportarPage() {
   const cat = useCatalogos();
@@ -69,15 +82,40 @@ function ImportarPage() {
   const [linhas, setLinhas] = useState<Record<string, string>[]>([]);
   const [mapeamento, setMapeamento] = useState<Mapeamento>({});
   const [nomeModelo, setNomeModelo] = useState("");
+  const [modelos, setModelos] = useState<{ id: string; nome: string; mapeamento: Mapeamento }[]>([]);
   const [analisado, setAnalisado] = useState<LinhaImportada[] | null>(null);
+  const [decisoes, setDecisoes] = useState<Record<number, DecisaoSetor>>({});
+  const [filtro, setFiltro] = useState<string>("TODAS");
+  const [confirmando, setConfirmando] = useState(false);
   const [aplicando, setAplicando] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const { data } = await supabase
+        .from("import_mappings")
+        .select("id, nome, mapeamento")
+        .order("created_at", { ascending: false });
+      setModelos(
+        (data ?? []).map((m) => ({
+          id: m.id,
+          nome: m.nome,
+          mapeamento: (m.mapeamento ?? {}) as Mapeamento,
+        })),
+      );
+    })();
+  }, []);
+
+  function limparAnalise() {
+    setAnalisado(null);
+    setDecisoes({});
+  }
 
   async function carregarArquivo(file: File) {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { cellDates: false });
     setWorkbook(wb);
     setArquivo(file.name);
-    setAnalisado(null);
+    limparAnalise();
     const primeira = wb.SheetNames[0] ?? "";
     setAba(primeira);
     lerAba(wb, primeira);
@@ -128,7 +166,14 @@ function ImportarPage() {
       cat.data!.funcoes,
     );
     setAnalisado(resultado);
-    toast.success(`${resultado.length} linhas analisadas.`);
+    setDecisoes(
+      Object.fromEntries(
+        resultado
+          .filter((l) => l.classificacao === "MUDANCA_DE_SETOR")
+          .map((l) => [l.linha, { tipo: "DEFINITIVA", fim: "" } as DecisaoSetor]),
+      ),
+    );
+    toast.success(`${resultado.length} linha(s) analisada(s). Nada foi gravado ainda.`);
   }
 
   const resumo = useMemo(() => {
@@ -137,20 +182,45 @@ function ImportarPage() {
     return r;
   }, [analisado]);
 
+  const selecionadas = useMemo(() => (analisado ?? []).filter((l) => l.aplicar), [analisado]);
+  const pendentesSetor = selecionadas.filter((l) => l.classificacao === "MUDANCA_DE_SETOR").length;
+  const visiveis = useMemo(
+    () => (analisado ?? []).filter((l) => filtro === "TODAS" || l.classificacao === filtro),
+    [analisado, filtro],
+  );
+
+  const decisaoInvalida = selecionadas.some(
+    (l) =>
+      l.classificacao === "MUDANCA_DE_SETOR" &&
+      decisoes[l.linha]?.tipo === "TEMPORARIA" &&
+      !decisoes[l.linha]?.fim,
+  );
+
   async function salvarModelo() {
     if (!nomeModelo.trim()) {
       toast.error("Informe um nome para o modelo.");
       return;
     }
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("import_mappings")
-      .insert({ nome: nomeModelo.trim(), mapeamento, created_by: user?.id ?? null });
-    if (error) toast.error(error.message);
-    else toast.success("Modelo de mapeamento salvo.");
+      .insert({ nome: nomeModelo.trim(), mapeamento, created_by: user?.id ?? null })
+      .select("id, nome, mapeamento")
+      .single();
+    if (error || !data) {
+      toast.error(error?.message ?? "Falha ao salvar o modelo.");
+      return;
+    }
+    setModelos((m) => [
+      { id: data.id, nome: data.nome, mapeamento: (data.mapeamento ?? {}) as Mapeamento },
+      ...m,
+    ]);
+    setNomeModelo("");
+    toast.success("Modelo de mapeamento salvo.");
   }
 
   async function aplicar() {
     if (!analisado || !cat.data) return;
+    setConfirmando(false);
     setAplicando(true);
     try {
       const { data: batch, error: erroBatch } = await supabase
@@ -179,6 +249,8 @@ function ImportarPage() {
           erros: l.erros,
           employee_id: l.employee_id,
           aplicar: l.aplicar,
+          setor_decisao: decisoes[l.linha]?.tipo ?? null,
+          setor_decisao_fim: decisoes[l.linha]?.fim || null,
         })),
       );
 
@@ -230,13 +302,15 @@ function ImportarPage() {
             .from("employees")
             .update({
               status: "DESLIGADO",
-              data_desligamento: toISO(d["data_desligamento"] ?? "") ?? new Date().toISOString().slice(0, 10),
+              data_desligamento: toISO(d["data_desligamento"] ?? "") ?? hoje(),
             })
             .eq("id", l.employee_id);
           if (error) throw error;
           aplicadas++;
         } else if (l.classificacao === "MUDANCA_DE_SETOR" && l.employee_id) {
           const atual = emp.data?.find((e) => e.id === l.employee_id);
+          const decisao = decisoes[l.linha] ?? { tipo: "DEFINITIVA", fim: "" };
+          const temporaria = decisao.tipo === "TEMPORARIA";
           const { error } = await supabase.from("employee_movements").insert({
             employee_id: l.employee_id,
             re: d["re"]!,
@@ -244,9 +318,10 @@ function ImportarPage() {
             area_destino_id: areaId,
             shift_origem_id: atual?.shift_id ?? null,
             shift_destino_id: turnoId ?? atual?.shift_id ?? null,
-            data_efetiva: new Date().toISOString().slice(0, 10),
-            tipo: "TRANSFERENCIA_DEFINITIVA",
-            temporaria: false,
+            data_efetiva: hoje(),
+            tipo: temporaria ? "EMPRESTIMO_TEMPORARIO" : "TRANSFERENCIA_DEFINITIVA",
+            temporaria,
+            data_fim: temporaria ? decisao.fim : null,
             motivo: `Importação ${arquivo}`,
             status: "PENDENTE",
             created_by: user?.id ?? null,
@@ -273,7 +348,7 @@ function ImportarPage() {
       toast.success(
         `${aplicadas} alteração(ões) aplicada(s). ${pendentes} mudança(s) de setor aguardando aprovação.`,
       );
-      setAnalisado(null);
+      limparAnalise();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao aplicar importação.");
     } finally {
@@ -298,7 +373,8 @@ function ImportarPage() {
           <h1 className="text-xl font-semibold tracking-tight text-foreground">Importar base</h1>
           <p className="text-sm text-muted-foreground">
             xlsx, xlsm ou csv — escolha a aba, mapeie as colunas, valide, compare e aprove antes de
-            aplicar. Ausência no arquivo nunca desliga ninguém.
+            aplicar. Nada é gravado até a confirmação final. Ausência no arquivo nunca desliga
+            ninguém.
           </p>
         </div>
 
@@ -326,7 +402,7 @@ function ImportarPage() {
                   onValueChange={(v) => {
                     setAba(v);
                     lerAba(workbook, v);
-                    setAnalisado(null);
+                    limparAnalise();
                   }}
                 >
                   <SelectTrigger>
@@ -351,6 +427,31 @@ function ImportarPage() {
               <CardTitle className="text-sm">2. Mapeamento de colunas</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {modelos.length > 0 && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Usar modelo salvo</Label>
+                  <Select
+                    onValueChange={(id) => {
+                      const m = modelos.find((x) => x.id === id);
+                      if (!m) return;
+                      setMapeamento(m.mapeamento);
+                      limparAnalise();
+                      toast.success(`Modelo "${m.nome}" aplicado.`);
+                    }}
+                  >
+                    <SelectTrigger className="max-w-xs">
+                      <SelectValue placeholder="Selecionar modelo…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {modelos.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
                 {CAMPOS.map((c) => (
                   <div key={c.key} className="space-y-1">
@@ -409,14 +510,26 @@ function ImportarPage() {
         {analisado && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">3. Prévia, classificação e aprovação</CardTitle>
+              <CardTitle className="text-sm">3. Prévia, comparação e aprovação</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFiltro("TODAS")}
+                  className={`rounded px-2 py-1 text-xs ${filtro === "TODAS" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+                >
+                  Todas: {analisado.length}
+                </button>
                 {Object.entries(resumo).map(([k, v]) => (
-                  <span key={k} className={`rounded px-2 py-1 text-xs ${CLASSE_COR[k as keyof typeof CLASSE_COR]}`}>
+                  <button
+                    type="button"
+                    key={k}
+                    onClick={() => setFiltro(filtro === k ? "TODAS" : k)}
+                    className={`rounded px-2 py-1 text-xs ${CLASSE_COR[k as keyof typeof CLASSE_COR]} ${filtro === k ? "ring-2 ring-ring" : ""}`}
+                  >
                     {humaniza(k)}: {v}
-                  </span>
+                  </button>
                 ))}
               </div>
 
@@ -430,10 +543,11 @@ function ImportarPage() {
                       <th className="p-2">Nome</th>
                       <th className="p-2">Classificação</th>
                       <th className="p-2">Diferenças / Erros</th>
+                      <th className="p-2">Decisão do setor</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {analisado.map((l) => (
+                    {visiveis.map((l) => (
                       <tr key={l.linha} className="border-b border-border/60">
                         <td className="p-2">
                           <Checkbox
@@ -466,23 +580,105 @@ function ImportarPage() {
                                 .map(([c, d]) => `${c}: ${d.de ?? "—"} → ${d.para}`)
                                 .join("; ") || "—"}
                         </td>
+                        <td className="p-2">
+                          {l.classificacao === "MUDANCA_DE_SETOR" ? (
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={decisoes[l.linha]?.tipo ?? "DEFINITIVA"}
+                                onValueChange={(v) =>
+                                  setDecisoes((prev) => ({
+                                    ...prev,
+                                    [l.linha]: {
+                                      tipo: v as DecisaoSetor["tipo"],
+                                      fim: prev[l.linha]?.fim ?? "",
+                                    },
+                                  }))
+                                }
+                              >
+                                <SelectTrigger className="h-7 w-[130px] text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="DEFINITIVA">Definitiva</SelectItem>
+                                  <SelectItem value="TEMPORARIA">Temporária</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {decisoes[l.linha]?.tipo === "TEMPORARIA" && (
+                                <Input
+                                  type="date"
+                                  className="h-7 w-[140px] text-xs"
+                                  value={decisoes[l.linha]?.fim ?? ""}
+                                  onChange={(e) =>
+                                    setDecisoes((prev) => ({
+                                      ...prev,
+                                      [l.linha]: { tipo: "TEMPORARIA", fim: e.target.value },
+                                    }))
+                                  }
+                                />
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              <div className="flex items-center gap-3">
-                <Button onClick={aplicar} disabled={aplicando}>
-                  {aplicando ? "Aplicando…" : "Aprovar e aplicar alterações"}
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={() => setConfirmando(true)}
+                  disabled={aplicando || selecionadas.length === 0 || decisaoInvalida}
+                >
+                  {aplicando ? "Aplicando…" : `Aprovar e aplicar (${selecionadas.length})`}
+                </Button>
+                <Button variant="outline" onClick={limparAnalise} disabled={aplicando}>
+                  Descartar prévia
                 </Button>
                 <Badge variant="secondary" className="text-[10px]">
                   Mudanças de setor entram como movimentação pendente
                 </Badge>
+                {decisaoInvalida && (
+                  <span className="text-xs text-destructive">
+                    Informe a data final das mudanças de setor temporárias.
+                  </span>
+                )}
               </div>
             </CardContent>
           </Card>
         )}
+
+        <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar aplicação da importação</AlertDialogTitle>
+              <AlertDialogDescription asChild>
+                <div className="space-y-2 text-sm">
+                  <p>
+                    Até aqui nada foi gravado. Ao confirmar, o lote <strong>{arquivo}</strong> (aba{" "}
+                    {aba || "—"}) será registrado e as linhas selecionadas serão aplicadas.
+                  </p>
+                  <ul className="list-disc pl-5">
+                    <li>{selecionadas.length} linha(s) selecionada(s) de {analisado?.length ?? 0}</li>
+                    <li>{pendentesSetor} mudança(s) de setor viram movimentação pendente</li>
+                    <li>
+                      {selecionadas.filter((l) => l.classificacao === "DESLIGAMENTO").length}{" "}
+                      desligamento(s) por status/data no arquivo
+                    </li>
+                  </ul>
+                </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Voltar</AlertDialogCancel>
+              <AlertDialogAction onClick={() => void aplicar()}>
+                Confirmar e aplicar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppShell>
   );
