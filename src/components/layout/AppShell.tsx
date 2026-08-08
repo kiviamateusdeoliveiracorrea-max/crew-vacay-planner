@@ -88,6 +88,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             Sua conta ainda não possui um perfil atribuído. Peça a um administrador para liberar seu
             acesso e as áreas correspondentes.
           </p>
+          <BootstrapAdmin />
         </main>
       ) : (
         <main className="mx-auto max-w-[1400px] px-4 py-6">{children}</main>
