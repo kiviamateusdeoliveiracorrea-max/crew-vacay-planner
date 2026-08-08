@@ -249,6 +249,22 @@ export function MovimentacaoDialog({
             </Select>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <Label>RE / matrícula</Label>
+              <Input value={colaborador?.re ?? ""} readOnly disabled placeholder="—" />
+            </div>
+            <div className="space-y-1">
+              <Label>Setor de origem</Label>
+              <Input value={nomeArea(areaOrigem)} readOnly disabled />
+            </div>
+            <div className="space-y-1">
+              <Label>Turno de origem</Label>
+              <Input value={nomeTurno(turnoOrigem)} readOnly disabled />
+            </div>
+          </div>
+
+
           {colaborador && vigente && definitiva && (
             <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
               <p>
