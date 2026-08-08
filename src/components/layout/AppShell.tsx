@@ -12,7 +12,7 @@ const LINKS = [
   { to: "/movimentacoes", label: "Movimentações" },
   { to: "/importar", label: "Importar base", cadastro: true },
   { to: "/auditoria", label: "Auditoria", admin: true },
-  { to: "/admin", label: "Usuários", admin: true },
+  { to: "/admin", label: "Usuários e Acessos", admin: true },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
