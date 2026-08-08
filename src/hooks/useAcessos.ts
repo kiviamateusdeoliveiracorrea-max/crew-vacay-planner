@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
+  areasParaSolicitacao,
   diagnosticoAcesso,
+  minhaSolicitacaoAcesso,
   listarUsuarios,
   promoverPrimeiroAdmin,
   removerAcesso,
   salvarAcesso,
+  solicitarAcesso,
 } from "@/lib/acessos.functions";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -66,6 +69,34 @@ export function useRemoverAcesso() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["usuarios-acesso"] });
       qc.invalidateQueries({ queryKey: ["audit"] });
+    },
+  });
+}
+
+export function useAreasSolicitacao() {
+  const fn = useServerFn(areasParaSolicitacao);
+  const { user } = useAuth();
+  return useQuery({ queryKey: ["areas-solicitacao"], enabled: !!user, queryFn: () => fn({}) });
+}
+
+export function useMinhaSolicitacao() {
+  const fn = useServerFn(minhaSolicitacaoAcesso);
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ["minha-solicitacao", user?.id],
+    enabled: !!user,
+    queryFn: () => fn({}),
+  });
+}
+
+export function useSolicitarAcesso() {
+  const fn = useServerFn(solicitarAcesso);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { areaId: string | null; justificativa: string }) =>
+      fn({ data } as never),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["minha-solicitacao"] });
     },
   });
 }
