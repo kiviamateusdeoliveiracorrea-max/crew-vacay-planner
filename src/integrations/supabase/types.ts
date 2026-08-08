@@ -761,28 +761,31 @@ export type Database = {
       }
       user_area_permissions: {
         Row: {
-          area_id: string
+          area_id: string | null
           created_at: string
           created_by: string | null
           id: string
+          unit_id: string | null
           updated_at: string
           updated_by: string | null
           user_id: string
         }
         Insert: {
-          area_id: string
+          area_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
+          unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
           user_id: string
         }
         Update: {
-          area_id?: string
+          area_id?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
+          unit_id?: string | null
           updated_at?: string
           updated_by?: string | null
           user_id?: string
@@ -793,6 +796,13 @@ export type Database = {
             columns: ["area_id"]
             isOneToOne: false
             referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_area_permissions_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
             referencedColumns: ["id"]
           },
         ]
