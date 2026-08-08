@@ -1,5 +1,6 @@
 import type { Tables, Enums } from "@/integrations/supabase/types";
 
+export type Unidade = Tables<"units">;
 export type Area = Tables<"areas">;
 export type Turno = Tables<"shifts">;
 export type Funcao = Tables<"functions">;
