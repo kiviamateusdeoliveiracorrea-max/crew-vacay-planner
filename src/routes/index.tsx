@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { DrilldownDialog, type Drilldown } from "@/components/painel/DrilldownDialog";
+import { RegistroDialog, type RegistroFoco } from "@/components/painel/RegistroDialog";
 import {
   useCatalogos,
   useEmployees,
@@ -62,6 +63,7 @@ function Painel() {
   const [status, setStatus] = useState(TODOS);
   const [criticidade, setCriticidade] = useState(TODOS);
   const [drill, setDrill] = useState<Drilldown>(null);
+  const [foco, setFoco] = useState<RegistroFoco>(null);
 
   const areas = cat.data?.areas ?? [];
   const turnos = cat.data?.turnos ?? [];
@@ -157,7 +159,14 @@ function Painel() {
     const fimMes = `${ref}-31`;
     const linhas = new Map<
       string,
-      { funcao: string; turno: string; total: number; ferias: number; chave: boolean }
+      {
+        funcao: string;
+        turno: string;
+        total: number;
+        ferias: number;
+        chave: boolean;
+        itens: VacationFull[];
+      }
     >();
     for (const e of employees) {
       if (e.status !== "ATIVO") continue;
@@ -175,12 +184,16 @@ function Painel() {
           total: 0,
           ferias: 0,
           chave: !!f?.funcao_chave,
+          itens: [] as VacationFull[],
         };
       linha.total += 1;
-      const emFerias = ativas.some(
+      const doColaborador = ativas.filter(
         (v) => v.employee_id === e.id && sobrepoe(v, { inicio: inicioMes, fim: fimMes }),
       );
-      if (emFerias) linha.ferias += 1;
+      if (doColaborador.length > 0) {
+        linha.ferias += 1;
+        linha.itens.push(...doColaborador);
+      }
       linhas.set(key, linha);
     }
     return [...linhas.values()].sort(
@@ -237,7 +250,8 @@ function Painel() {
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-foreground">Painel gerencial</h1>
           <p className="text-sm text-muted-foreground">
-            Indicadores clicáveis de férias, conflitos e movimentações da operação.
+            Todos os indicadores são clicáveis e rastreáveis até o registro de origem e sua
+            trilha de auditoria.
           </p>
         </div>
 
@@ -393,7 +407,17 @@ function Painel() {
                       {capacidade.map((l) => {
                         const disp = l.total - l.ferias;
                         return (
-                          <tr key={`${l.funcao}|${l.turno}`} className="border-b border-border/60">
+                          <tr
+                            key={`${l.funcao}|${l.turno}`}
+                            onClick={() =>
+                              setDrill({
+                                titulo: `Férias — ${l.funcao} · turno ${l.turno}`,
+                                tipo: "ferias",
+                                itens: l.itens,
+                              })
+                            }
+                            className="cursor-pointer border-b border-border/60 hover:bg-accent/40"
+                          >
                             <td className="py-1.5">
                               {l.funcao}{" "}
                               {l.chave && (
@@ -434,6 +458,15 @@ function Painel() {
       <DrilldownDialog
         data={drill}
         onClose={() => setDrill(null)}
+        onAbrirRegistro={setFoco}
+        nomeArea={nomeArea}
+        nomeTurno={nomeTurno}
+        nomeFuncao={nomeFuncao}
+      />
+
+      <RegistroDialog
+        registro={foco}
+        onClose={() => setFoco(null)}
         nomeArea={nomeArea}
         nomeTurno={nomeTurno}
         nomeFuncao={nomeFuncao}
