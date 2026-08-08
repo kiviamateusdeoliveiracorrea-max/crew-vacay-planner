@@ -19,6 +19,9 @@ import {
 import { fmtData, humaniza } from "@/lib/sistema";
 
 export const Route = createFileRoute("/movimentacoes")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    registro: typeof search['registro'] === "string" ? (search['registro'] as string) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Movimentações de Colaboradores | Gestão de Férias" },
@@ -47,6 +50,9 @@ function MovimentacoesPage() {
   const perfil = usePerfil();
   const decidir = useDecidirMovimentacao();
 
+  const { registro: focoId } = Route.useSearch();
+  const navigate = Route.useNavigate();
+
   const [busca, setBusca] = useState("");
   const [aberto, setAberto] = useState(false);
   const [editando, setEditando] = useState<MovementFull | null>(null);
@@ -60,11 +66,12 @@ function MovimentacoesPage() {
     const termo = busca.trim().toLowerCase();
     return (mov.data ?? []).filter(
       (m) =>
-        !termo ||
+        (focoId ? m.id === focoId : true) &&
+        (!termo ||
         (m.employee?.nome ?? "").toLowerCase().includes(termo) ||
-        (m.re ?? "").includes(termo),
+          (m.re ?? "").includes(termo)),
     );
-  }, [mov.data, busca]);
+  }, [mov.data, busca, focoId]);
 
   const feriasDoColaborador = (employeeId: string) =>
     (fer.data ?? [])
@@ -92,6 +99,23 @@ function MovimentacoesPage() {
             </Button>
           )}
         </div>
+
+        {focoId && (
+          <Card className="border-primary/50 bg-accent/30">
+            <CardContent className="flex flex-wrap items-center justify-between gap-2 py-3">
+              <p className="text-sm text-foreground">
+                Rastreando uma movimentação específica vinda do painel executivo.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate({ search: { registro: undefined } })}
+              >
+                Ver todas as movimentações
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <Input
           placeholder="Buscar por nome ou RE"
