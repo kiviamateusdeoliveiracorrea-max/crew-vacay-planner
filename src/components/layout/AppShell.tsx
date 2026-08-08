@@ -6,6 +6,8 @@ import { usePerfil } from "@/hooks/useSistema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BootstrapAdmin } from "@/components/layout/BootstrapAdmin";
+import { SolicitarAcesso } from "@/components/layout/SolicitarAcesso";
+
 
 const LINKS = [
   { to: "/", label: "Painel" },
@@ -86,11 +88,25 @@ export function AppShell({ children }: { children: ReactNode }) {
         <main className="mx-auto max-w-2xl px-4 py-16 text-center">
           <h1 className="text-lg font-semibold text-foreground">Acesso pendente de liberação</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Sua conta ainda não possui um perfil atribuído. Peça a um administrador para liberar seu
-            acesso e as áreas correspondentes.
+            Sua conta ainda não possui um perfil atribuído. Solicite acesso abaixo — a liberação
+            depende da aprovação de um administrador.
           </p>
+          <SolicitarAcesso />
           <BootstrapAdmin />
+          <div className="mt-8">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                navigate({ to: "/auth", replace: true });
+              }}
+            >
+              Sair
+            </Button>
+          </div>
         </main>
+
       ) : (
         <main className="mx-auto max-w-[1400px] px-4 py-6">{children}</main>
       )}
