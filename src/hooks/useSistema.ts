@@ -236,3 +236,20 @@ export function useAuditoria(limite = 200) {
     },
   });
 }
+
+export function useAuditoriaRegistro(registroId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["audit", "registro", registroId],
+    enabled: !!registroId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("audit_log")
+        .select("*")
+        .eq("registro_id", registroId!)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+}
