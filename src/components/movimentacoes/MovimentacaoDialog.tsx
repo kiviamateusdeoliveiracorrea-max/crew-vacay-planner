@@ -342,7 +342,34 @@ export function MovimentacaoDialog({
               <Label>Data efetiva</Label>
               <Input type="date" value={dataEfetiva} onChange={(e) => setDataEfetiva(e.target.value)} />
             </div>
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as Movement["status"])}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(["PENDENTE", "APROVADA", "REJEITADA", "CANCELADA"] as const).map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {humaniza(s)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Somente movimentações aprovadas alteram a alocação.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label>Aprovador</Label>
+              <Input
+                value={registro?.aprovador_id ? "Registrado na aprovação" : "Pendente de decisão"}
+                readOnly
+                disabled
+              />
+            </div>
           </div>
+
 
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
             <Switch
