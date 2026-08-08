@@ -64,6 +64,7 @@ export function MovimentacaoDialog({
   const [dataFim, setDataFim] = useState("");
   const [motivo, setMotivo] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [status, setStatus] = useState<Movement["status"]>("PENDENTE");
 
   useEffect(() => {
     if (!open) return;
@@ -76,8 +77,10 @@ export function MovimentacaoDialog({
     setDataFim(registro?.data_fim ?? "");
     setMotivo(registro?.motivo ?? "");
     setObservacao(registro?.observacao ?? "");
+    setStatus(registro?.status ?? "PENDENTE");
     setBusca("");
   }, [open, registro]);
+
 
   const colaborador = employees.find((e) => e.id === employeeId) ?? null;
   const tipoTravado = ehDefinitivo(tipo) || ehTemporario(tipo);
