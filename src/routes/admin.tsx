@@ -52,7 +52,12 @@ function AdminPage() {
       return (profiles ?? []).map((p) => ({
         ...p,
         papeis: (roles ?? []).filter((r) => r.user_id === p.id).map((r) => r.role as Papel),
-        areas: (perms ?? []).filter((r) => r.user_id === p.id).map((r) => r.area_id),
+        areas: (perms ?? [])
+          .filter((r) => r.user_id === p.id && r.area_id)
+          .map((r) => r.area_id as string),
+        unidades: (perms ?? [])
+          .filter((r) => r.user_id === p.id && !r.area_id && r.unit_id)
+          .map((r) => r.unit_id as string),
       }));
     },
   });
