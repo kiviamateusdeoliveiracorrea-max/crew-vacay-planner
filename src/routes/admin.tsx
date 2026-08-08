@@ -1,28 +1,30 @@
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/AppShell";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { useCatalogos, usePerfil } from "@/hooks/useSistema";
-import { PAPEIS, PAPEL_DESCRICAO, type Papel } from "@/lib/sistema";
+import { useRemoverAcesso, useSalvarAcesso, useUsuariosAcesso } from "@/hooks/useAcessos";
+import { PAPEIS, PAPEL_DESCRICAO, fmtDataHora, type Papel } from "@/lib/sistema";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Usuários e Permissões | Gestão de Férias" },
+      { title: "Usuários e Acessos | Gestão de Férias" },
       {
         name: "description",
         content:
-          "Atribua perfis ADMIN, ANALISTA, LIDER, COORDENADOR e GERENTE e libere as áreas visíveis para cada usuário.",
+          "Atribua perfis ADMIN, ANALISTA, LIDER, COORDENADOR e GERENTE, libere unidades e áreas e acompanhe o último acesso de cada usuário.",
       },
-      { property: "og:title", content: "Usuários e Permissões" },
+      { property: "og:title", content: "Usuários e Acessos" },
       {
         property: "og:description",
-        content: "Gestão de perfis de acesso e permissões por área da operação.",
+        content: "Gestão de perfis de acesso, unidades e áreas autorizadas da operação.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -31,98 +33,197 @@ export const Route = createFileRoute("/admin")({
   component: AdminPage,
 });
 
+type Rascunho = { papeis: Papel[]; unidades: string[]; areas: string[]; ativo: boolean };
+
 function AdminPage() {
   const perfil = usePerfil();
   const cat = useCatalogos();
-  const qc = useQueryClient();
+  const ehAdmin = perfil.tem("ADMIN");
+  const usuarios = useUsuariosAcesso(ehAdmin);
+  const salvar = useSalvarAcesso();
+  const remover = useRemoverAcesso();
 
-  const usuarios = useQuery({
-    queryKey: ["usuarios"],
-    enabled: perfil.tem("ADMIN"),
-    queryFn: async () => {
-      const [{ data: profiles, error: e1 }, { data: roles, error: e2 }, { data: perms, error: e3 }] =
-        await Promise.all([
-          supabase.from("profiles").select("*").order("email"),
-          supabase.from("user_roles").select("*"),
-          supabase.from("user_area_permissions").select("*"),
-        ]);
-      if (e1) throw e1;
-      if (e2) throw e2;
-      if (e3) throw e3;
-      return (profiles ?? []).map((p) => ({
-        ...p,
-        papeis: (roles ?? []).filter((r) => r.user_id === p.id).map((r) => r.role as Papel),
-        areas: (perms ?? [])
-          .filter((r) => r.user_id === p.id && r.area_id)
-          .map((r) => r.area_id as string),
-        unidades: (perms ?? [])
-          .filter((r) => r.user_id === p.id && !r.area_id && r.unit_id)
-          .map((r) => r.unit_id as string),
-      }));
-    },
-  });
+  const [busca, setBusca] = useState("");
+  const [rascunhos, setRascunhos] = useState<Record<string, Rascunho>>({});
 
   const areas = cat.data?.areas ?? [];
   const unidades = cat.data?.unidades ?? [];
 
-  async function alternarPapel(userId: string, papel: Papel, ativo: boolean) {
-    const q = ativo
-      ? supabase.from("user_roles").insert({ user_id: userId, role: papel })
-      : supabase.from("user_roles").delete().eq("user_id", userId).eq("role", papel);
-    const { error } = await q;
-    if (error) toast.error(error.message);
-    else {
-      toast.success("Perfil atualizado.");
-      qc.invalidateQueries({ queryKey: ["usuarios"] });
-      qc.invalidateQueries({ queryKey: ["perfil"] });
-    }
+  const lista = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    const todos = usuarios.data ?? [];
+    return termo
+      ? todos.filter((u) => (u.email ?? "").toLowerCase().includes(termo))
+      : todos;
+  }, [usuarios.data, busca]);
+
+  const pendentes = lista.filter((u) => u.papeis.length === 0);
+  const cadastrados = lista.filter((u) => u.papeis.length > 0);
+
+  function estado(u: (typeof lista)[number]): Rascunho {
+    return (
+      rascunhos[u.id] ?? {
+        papeis: u.papeis,
+        unidades: u.unidades,
+        areas: u.areas,
+        ativo: u.ativo,
+      }
+    );
   }
 
-  async function alternarUnidade(userId: string, unitId: string, ativo: boolean) {
-    const q = ativo
-      ? supabase
-          .from("user_area_permissions")
-          .insert({ user_id: userId, unit_id: unitId, area_id: null })
-      : supabase
-          .from("user_area_permissions")
-          .delete()
-          .eq("user_id", userId)
-          .eq("unit_id", unitId)
-          .is("area_id", null);
-    const { error } = await q;
-    if (error) toast.error(error.message);
-    else {
-      qc.invalidateQueries({ queryKey: ["usuarios"] });
-      qc.invalidateQueries({ queryKey: ["perfil"] });
-    }
+  function atualizar(id: string, patch: Partial<Rascunho>, base: Rascunho) {
+    setRascunhos((r) => ({ ...r, [id]: { ...base, ...patch } }));
   }
 
-  async function alternarArea(userId: string, areaId: string, unitId: string | null, ativo: boolean) {
-    const q = ativo
-      ? supabase
-          .from("user_area_permissions")
-          .insert({ user_id: userId, area_id: areaId, unit_id: unitId })
-      : supabase
-          .from("user_area_permissions")
-          .delete()
-          .eq("user_id", userId)
-          .eq("area_id", areaId);
-    const { error } = await q;
-    if (error) toast.error(error.message);
-    else {
-      qc.invalidateQueries({ queryKey: ["usuarios"] });
-      qc.invalidateQueries({ queryKey: ["perfil"] });
-    }
+  function alternar(lst: string[], v: string, on: boolean) {
+    return on ? Array.from(new Set([...lst, v])) : lst.filter((x) => x !== v);
   }
 
+  function aplicar(id: string, r: Rascunho) {
+    salvar.mutate(
+      { userId: id, papeis: r.papeis, unidades: r.unidades, areas: r.areas, ativo: r.ativo },
+      {
+        onSuccess: () => {
+          toast.success("Acesso atualizado.");
+          setRascunhos((s) => {
+            const { [id]: _, ...resto } = s;
+            return resto;
+          });
+        },
+        onError: (e) => toast.error((e as Error).message),
+      },
+    );
+  }
 
-  if (!perfil.loading && !perfil.tem("ADMIN")) {
+  if (!perfil.loading && !ehAdmin) {
     return (
       <AppShell>
         <p className="text-sm text-muted-foreground">
-          Apenas administradores gerenciam usuários e permissões.
+          Apenas administradores gerenciam usuários e acessos.
         </p>
       </AppShell>
+    );
+  }
+
+  function cartao(u: (typeof lista)[number]) {
+    const r = estado(u);
+    const alterado = !!rascunhos[u.id];
+    return (
+      <Card key={u.id} className={u.ativo ? "" : "opacity-70"}>
+        <CardContent className="space-y-3 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-foreground">{u.nome ?? u.email ?? u.id}</p>
+              <p className="text-xs text-muted-foreground">{u.email ?? "sem e-mail"}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                Último acesso: {fmtDataHora(u.ultimoAcesso)} · Permissão concedida por:{" "}
+                {u.concedidoPor ?? "—"}
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-xs">
+              <Switch
+                checked={r.ativo}
+                onCheckedChange={(c) => atualizar(u.id, { ativo: c }, r)}
+              />
+              {r.ativo ? "Ativo" : "Desativado"}
+            </label>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            {PAPEIS.map((p) => (
+              <label key={p} className="flex items-center gap-2 text-xs">
+                <Checkbox
+                  checked={r.papeis.includes(p)}
+                  onCheckedChange={(c) =>
+                    atualizar(u.id, { papeis: alternar(r.papeis, p, !!c) as Papel[] }, r)
+                  }
+                />
+                {p}
+              </label>
+            ))}
+          </div>
+
+          <div>
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+              Unidades autorizadas (todas as áreas da unidade)
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {unidades.map((un) => (
+                <label key={un.id} className="flex items-center gap-2 text-xs">
+                  <Checkbox
+                    checked={r.unidades.includes(un.id)}
+                    onCheckedChange={(c) =>
+                      atualizar(u.id, { unidades: alternar(r.unidades, un.id, !!c) }, r)
+                    }
+                  />
+                  {un.nome}
+                </label>
+              ))}
+              {unidades.length === 0 && (
+                <span className="text-xs text-muted-foreground">Nenhuma unidade cadastrada.</span>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+              Áreas autorizadas
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {areas.map((a) => {
+                const porUnidade = !!a.unit_id && r.unidades.includes(a.unit_id);
+                return (
+                  <label key={a.id} className="flex items-center gap-2 text-xs">
+                    <Checkbox
+                      checked={porUnidade || r.areas.includes(a.id)}
+                      disabled={porUnidade}
+                      onCheckedChange={(c) =>
+                        atualizar(u.id, { areas: alternar(r.areas, a.id, !!c) }, r)
+                      }
+                    />
+                    {a.nome}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <Button size="sm" disabled={!alterado || salvar.isPending} onClick={() => aplicar(u.id, r)}>
+              Salvar alterações
+            </Button>
+            {alterado && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  setRascunhos((s) => {
+                    const { [u.id]: _, ...resto } = s;
+                    return resto;
+                  })
+                }
+              >
+                Descartar
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-destructive"
+              disabled={remover.isPending}
+              onClick={() => {
+                if (!confirm(`Remover todo o acesso de ${u.email ?? u.id}?`)) return;
+                remover.mutate(u.id, {
+                  onSuccess: () => toast.success("Acesso removido."),
+                  onError: (e) => toast.error((e as Error).message),
+                });
+              }}
+            >
+              Remover acesso
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -130,11 +231,9 @@ function AdminPage() {
     <AppShell>
       <div className="space-y-4">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            Usuários e permissões
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Usuários e Acessos</h1>
           <p className="text-sm text-muted-foreground">
-            As permissões valem no banco de dados (RLS), não apenas na interface.
+            As permissões valem no banco de dados (RLS) e cada alteração é registrada na auditoria.
           </p>
         </div>
 
@@ -154,88 +253,40 @@ function AdminPage() {
           </CardContent>
         </Card>
 
+        <Input
+          placeholder="Pesquisar por e-mail…"
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          className="max-w-sm"
+        />
+
         {usuarios.isLoading ? (
           <p className="text-sm text-muted-foreground">Carregando usuários…</p>
+        ) : usuarios.error ? (
+          <p className="text-sm text-destructive">{(usuarios.error as Error).message}</p>
         ) : (
-          <div className="space-y-3">
-            {(usuarios.data ?? []).map((u) => (
-              <Card key={u.id}>
-                <CardContent className="space-y-3 py-4">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">{u.nome ?? u.email}</p>
-                    <p className="text-xs text-muted-foreground">{u.email}</p>
-                  </div>
+          <div className="space-y-6">
+            <section className="space-y-3">
+              <h2 className="text-sm font-medium text-foreground">
+                Pendentes de liberação ({pendentes.length})
+              </h2>
+              {pendentes.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum usuário aguardando liberação.</p>
+              ) : (
+                pendentes.map(cartao)
+              )}
+            </section>
 
-                  <div className="flex flex-wrap gap-3">
-                    {PAPEIS.map((p) => (
-                      <label key={p} className="flex items-center gap-2 text-xs">
-                        <Checkbox
-                          checked={u.papeis.includes(p)}
-                          onCheckedChange={(c) => alternarPapel(u.id, p, !!c)}
-                        />
-                        {p}
-                      </label>
-                    ))}
-                  </div>
-
-                  <div>
-                    <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
-                      Unidades autorizadas (todas as áreas da unidade)
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      {unidades.map((un) => (
-                        <label key={un.id} className="flex items-center gap-2 text-xs">
-                          <Checkbox
-                            checked={u.unidades.includes(un.id)}
-                            onCheckedChange={(c) => alternarUnidade(u.id, un.id, !!c)}
-                          />
-                          {un.nome}
-                        </label>
-                      ))}
-                      {unidades.length === 0 && (
-                        <span className="text-xs text-muted-foreground">
-                          Nenhuma unidade cadastrada.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
-                      Áreas autorizadas
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      {areas.map((a) => (
-                        <label key={a.id} className="flex items-center gap-2 text-xs">
-                          <Checkbox
-                            checked={
-                              u.areas.includes(a.id) ||
-                              (!!a.unit_id && u.unidades.includes(a.unit_id))
-                            }
-                            disabled={!!a.unit_id && u.unidades.includes(a.unit_id)}
-                            onCheckedChange={(c) => alternarArea(u.id, a.id, a.unit_id, !!c)}
-                          />
-                          {a.nome}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                </CardContent>
-              </Card>
-            ))}
-            {(usuarios.data ?? []).length === 0 && (
-              <Card>
-                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                  Nenhum usuário cadastrado ainda.
-                  <div className="mt-3">
-                    <Button variant="outline" onClick={() => usuarios.refetch()}>
-                      Atualizar
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            <section className="space-y-3">
+              <h2 className="text-sm font-medium text-foreground">
+                Usuários com acesso ({cadastrados.length})
+              </h2>
+              {cadastrados.length === 0 ? (
+                <p className="text-xs text-muted-foreground">Nenhum usuário com perfil ainda.</p>
+              ) : (
+                cadastrados.map(cartao)
+              )}
+            </section>
           </div>
         )}
       </div>
