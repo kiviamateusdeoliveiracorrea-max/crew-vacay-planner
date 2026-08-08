@@ -14,6 +14,56 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_requests: {
+        Row: {
+          area_id: string | null
+          created_at: string
+          decidido_em: string | null
+          decidido_por: string | null
+          email: string | null
+          id: string
+          justificativa: string
+          resposta: string | null
+          status: Database["public"]["Enums"]["approval_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          area_id?: string | null
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          email?: string | null
+          id?: string
+          justificativa: string
+          resposta?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          area_id?: string | null
+          created_at?: string
+          decidido_em?: string | null
+          decidido_por?: string | null
+          email?: string | null
+          id?: string
+          justificativa?: string
+          resposta?: string | null
+          status?: Database["public"]["Enums"]["approval_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "access_requests_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approvals: {
         Row: {
           area_id: string | null
