@@ -28,6 +28,9 @@ import {
 } from "@/lib/sistema";
 
 export const Route = createFileRoute("/ferias")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    registro: typeof search.registro === "string" ? search.registro : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Programação de Férias por Área | Gestão de Férias" },
@@ -57,6 +60,9 @@ function FeriasPage() {
   const excluir = useExcluirFerias();
   const reconhecer = useReconhecerConflito();
 
+  const { registro: focoId } = Route.useSearch();
+  const navigate = Route.useNavigate();
+
   const [aba, setAba] = useState("__todas__");
   const [busca, setBusca] = useState("");
   const [aberto, setAberto] = useState(false);
@@ -77,6 +83,7 @@ function FeriasPage() {
   const registros = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     return (fer.data ?? []).filter((v) => {
+      if (focoId) return v.id === focoId;
       const area = v.area_id_snapshot ?? v.employee?.area_id ?? null;
       if (aba !== "__todas__" && area !== aba) return false;
       if (!termo) return true;
@@ -85,7 +92,7 @@ function FeriasPage() {
         (v.employee?.re ?? "").includes(termo)
       );
     });
-  }, [fer.data, aba, busca]);
+  }, [fer.data, aba, busca, focoId]);
 
   return (
     <AppShell>
@@ -106,6 +113,23 @@ function FeriasPage() {
             Programar férias
           </Button>
         </div>
+
+        {focoId && (
+          <Card className="border-primary/50 bg-accent/30">
+            <CardContent className="flex flex-wrap items-center justify-between gap-2 py-3">
+              <p className="text-sm text-foreground">
+                Rastreando um registro específico vindo do painel executivo.
+              </p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => navigate({ search: { registro: undefined } })}
+              >
+                Ver todos os registros
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="flex flex-wrap items-center gap-3">
           <Input
