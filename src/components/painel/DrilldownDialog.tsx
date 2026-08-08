@@ -15,6 +15,7 @@ import {
   type Severidade,
 } from "@/lib/sistema";
 import { severidadeMax } from "@/lib/conflitos";
+import type { RegistroFoco } from "@/components/painel/RegistroDialog";
 
 export type Drilldown =
   | { titulo: string; tipo: "ferias"; itens: VacationFull[] }
@@ -24,12 +25,14 @@ export type Drilldown =
 export function DrilldownDialog({
   data,
   onClose,
+  onAbrirRegistro,
   nomeArea,
   nomeTurno,
   nomeFuncao,
 }: {
   data: Drilldown;
   onClose: () => void;
+  onAbrirRegistro: (r: RegistroFoco) => void;
   nomeArea: (id: string | null) => string;
   nomeTurno: (id: string | null) => string;
   nomeFuncao: (id: string | null) => string;
@@ -40,7 +43,9 @@ export function DrilldownDialog({
         <DialogHeader>
           <DialogTitle>{data?.titulo}</DialogTitle>
           <DialogDescription>
-            {data ? `${data.itens.length} registro(s) compõem este indicador.` : ""}
+            {data
+              ? `${data.itens.length} registro(s) compõem este indicador. Clique em um item para abrir o registro de origem e a trilha de auditoria.`
+              : ""}
           </DialogDescription>
         </DialogHeader>
 
@@ -52,7 +57,12 @@ export function DrilldownDialog({
             {data.itens.map((v) => {
               const sev = severidadeMax(v.conflitos);
               return (
-                <div key={v.id} className="rounded-lg border border-border p-3">
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => onAbrirRegistro({ tipo: "ferias", item: v })}
+                  className="w-full rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/60 hover:bg-accent/40"
+                >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
                       <p className="text-sm font-medium text-foreground">
@@ -89,7 +99,7 @@ export function DrilldownDialog({
                       ))}
                     </ul>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
@@ -101,7 +111,12 @@ export function DrilldownDialog({
               <p className="text-sm text-muted-foreground">Nenhum registro.</p>
             )}
             {data.itens.map((m) => (
-              <div key={m.id} className="rounded-lg border border-border p-3">
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => onAbrirRegistro({ tipo: "movimentacao", item: m })}
+                className="w-full rounded-lg border border-border p-3 text-left transition-colors hover:border-primary/60 hover:bg-accent/40"
+              >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium text-foreground">
@@ -120,7 +135,7 @@ export function DrilldownDialog({
                     </Badge>
                   </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         )}
