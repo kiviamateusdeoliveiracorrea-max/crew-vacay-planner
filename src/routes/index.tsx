@@ -1,31 +1,43 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/hooks/useAuth";
-import { useDados, useExcluirFerias } from "@/hooks/useFerias";
-import { AlertasPanel } from "@/components/ferias/AlertasPanel";
-import { AreaTabela } from "@/components/ferias/AreaTabela";
-import { FeriasDialog } from "@/components/ferias/FeriasDialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, useState } from "react";
+import { AppShell } from "@/components/layout/AppShell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { mapaConflitos, normaliza, severidadeDe, type Colaborador, type Registro } from "@/lib/ferias";
-import { LogOut, Search } from "lucide-react";
-import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { DrilldownDialog, type Drilldown } from "@/components/painel/DrilldownDialog";
+import {
+  useCatalogos,
+  useEmployees,
+  useMovements,
+  useVacations,
+  type MovementFull,
+  type VacationFull,
+} from "@/hooks/useSistema";
+import { ehCritico, severidadeMax } from "@/lib/conflitos";
+import { humaniza, mesDe, sobrepoe, SEVERIDADE_PESO, type Severidade } from "@/lib/sistema";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Controle de Férias por Área e Função" },
+      { title: "Painel Gerencial de Férias | Operação Logística" },
       {
         name: "description",
         content:
-          "Programe férias por área, bloqueie sobreposições da mesma função e receba alertas para operadores de empilhadeira.",
+          "Indicadores de férias por área, turno e função, conflitos críticos, funções-chave impactadas e movimentações previstas.",
       },
-      { property: "og:title", content: "Controle de Férias por Área e Função" },
+      { property: "og:title", content: "Painel Gerencial de Férias" },
       {
         property: "og:description",
-        content: "Programação de férias por área com alertas automáticos de conflito de função.",
+        content: "Acompanhe férias, conflitos críticos e movimentações da operação em tempo real.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -34,175 +46,429 @@ export const Route = createFileRoute("/")({
   component: Painel,
 });
 
+const TODOS = "__todos__";
+
 function Painel() {
-  const { session, loading } = useAuth();
-  const navigate = useNavigate();
-  const { data, isLoading } = useDados();
-  const excluir = useExcluirFerias();
-  const [area, setArea] = useState<string | null>(null);
-  const [busca, setBusca] = useState("");
-  const [dialogo, setDialogo] = useState<{ colaborador: Colaborador; registro: Registro | null } | null>(null);
+  const cat = useCatalogos();
+  const emp = useEmployees();
+  const fer = useVacations();
+  const mov = useMovements();
 
-  useEffect(() => {
-    if (!loading && !session) navigate({ to: "/auth", replace: true });
-  }, [loading, session, navigate]);
+  const [unidade, setUnidade] = useState(TODOS);
+  const [areaId, setAreaId] = useState(TODOS);
+  const [shiftId, setShiftId] = useState(TODOS);
+  const [functionId, setFunctionId] = useState(TODOS);
+  const [mes, setMes] = useState("");
+  const [status, setStatus] = useState(TODOS);
+  const [criticidade, setCriticidade] = useState(TODOS);
+  const [drill, setDrill] = useState<Drilldown>(null);
 
-  const colaboradores = data?.colaboradores ?? [];
-  const registros = useMemo(() => data?.registros ?? [], [data]);
-  const mapa = useMemo(() => mapaConflitos(registros), [registros]);
+  const areas = cat.data?.areas ?? [];
+  const turnos = cat.data?.turnos ?? [];
+  const funcoes = cat.data?.funcoes ?? [];
+  const employees = emp.data ?? [];
 
-  const areas = useMemo(
-    () => Array.from(new Set(colaboradores.map((c) => c.area))).sort((a, b) => a.localeCompare(b, "pt-BR")),
-    [colaboradores],
+  const nomeArea = (id: string | null) => areas.find((a) => a.id === id)?.nome ?? "—";
+  const nomeTurno = (id: string | null) => turnos.find((t) => t.id === id)?.nome ?? "—";
+  const nomeFuncao = (id: string | null) => funcoes.find((f) => f.id === id)?.nome ?? "—";
+
+  const unidades = useMemo(
+    () => Array.from(new Set(areas.map((a) => a.unidade).filter(Boolean))) as string[],
+    [areas],
   );
 
-  useEffect(() => {
-    if (!area && areas.length > 0) setArea(areas[0] ?? null);
-  }, [areas, area]);
+  const areasVisiveis = useMemo(
+    () => areas.filter((a) => unidade === TODOS || a.unidade === unidade),
+    [areas, unidade],
+  );
 
-  const criticosPorArea = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of registros) {
-      if (severidadeDe(mapa.get(r.id)) !== "ok") {
-        m.set(r.colaborador.area, (m.get(r.colaborador.area) ?? 0) + 1);
+  const ferias = useMemo<VacationFull[]>(() => {
+    const idsArea = new Set(areasVisiveis.map((a) => a.id));
+    return (fer.data ?? []).filter((v) => {
+      if (!v.employee) return false;
+      const area = v.area_id_snapshot ?? v.employee.area_id;
+      if (!idsArea.has(area ?? "")) return false;
+      if (areaId !== TODOS && area !== areaId) return false;
+      const turno = v.shift_id_snapshot ?? v.employee.shift_id;
+      if (shiftId !== TODOS && turno !== shiftId) return false;
+      if (functionId !== TODOS && v.employee.function_id !== functionId) return false;
+      if (status !== TODOS && v.status !== status) return false;
+      if (mes && !(mesDe(v.inicio) <= mes && mes <= mesDe(v.fim))) return false;
+      if (criticidade !== TODOS) {
+        const s = severidadeMax(v.conflitos);
+        if (!s || SEVERIDADE_PESO[s] < SEVERIDADE_PESO[criticidade as Severidade]) return false;
       }
+      return true;
+    });
+  }, [fer.data, areasVisiveis, areaId, shiftId, functionId, status, mes, criticidade]);
+
+  const movimentacoes = useMemo<MovementFull[]>(() => {
+    const idsArea = new Set(areasVisiveis.map((a) => a.id));
+    return (mov.data ?? []).filter((m) => {
+      const relevante =
+        idsArea.has(m.area_origem_id ?? "") || idsArea.has(m.area_destino_id ?? "");
+      if (!relevante) return false;
+      if (areaId !== TODOS && m.area_origem_id !== areaId && m.area_destino_id !== areaId)
+        return false;
+      if (shiftId !== TODOS && m.shift_origem_id !== shiftId && m.shift_destino_id !== shiftId)
+        return false;
+      if (mes && mesDe(m.data_efetiva) !== mes && !(m.temporaria && m.data_fim && mesDe(m.data_efetiva) <= mes && mes <= mesDe(m.data_fim)))
+        return false;
+      return true;
+    });
+  }, [mov.data, areasVisiveis, areaId, shiftId, mes]);
+
+  const ativas = ferias.filter((v) => v.status !== "CANCELADA");
+  const criticas = ativas.filter((v) => ehCritico(v.conflitos));
+  const chaveImpactadas = ativas.filter(
+    (v) => funcoes.find((f) => f.id === v.employee?.function_id)?.funcao_chave,
+  );
+  const semSubstituto = ativas.filter((v) => !v.substituto_employee_id && !v.substituto_nome);
+  const movDuranteFerias = ativas.filter((v) =>
+    v.conflitos.some((c) => c.regra === "MOVIMENTACAO_DURANTE_FERIAS" || !!c.movement_id),
+  );
+  const pendencias = movimentacoes.filter((m) => m.status === "PENDENTE");
+  const previstas = movimentacoes.filter(
+    (m) => m.status !== "CANCELADA" && m.status !== "REJEITADA",
+  );
+
+  const porMes = useMemo(() => {
+    const mapa = new Map<string, VacationFull[]>();
+    for (const v of ativas) {
+      const k = mesDe(v.inicio);
+      mapa.set(k, [...(mapa.get(k) ?? []), v]);
     }
-    return m;
-  }, [registros, mapa]);
+    return [...mapa.entries()].sort(([a], [b]) => a.localeCompare(b));
+  }, [ativas]);
 
-  const daArea = colaboradores
-    .filter((c) => c.area === area)
-    .filter((c) => (busca ? normaliza(c.nome + c.funcao + (c.re ?? "")).includes(normaliza(busca)) : true))
-    .sort((a, b) => a.funcao.localeCompare(b.funcao, "pt-BR") || a.nome.localeCompare(b.nome, "pt-BR"));
+  const porArea = useMemo(() => {
+    const mapa = new Map<string, VacationFull[]>();
+    for (const v of ativas) {
+      const k = v.area_id_snapshot ?? v.employee?.area_id ?? "";
+      mapa.set(k, [...(mapa.get(k) ?? []), v]);
+    }
+    return [...mapa.entries()].sort((a, b) => b[1].length - a[1].length);
+  }, [ativas]);
 
-  async function sair() {
-    await supabase.auth.signOut();
-    navigate({ to: "/auth", replace: true });
-  }
+  const capacidade = useMemo(() => {
+    const idsArea = new Set(areasVisiveis.map((a) => a.id));
+    const ref = mes || new Date().toISOString().slice(0, 7);
+    const inicioMes = `${ref}-01`;
+    const fimMes = `${ref}-31`;
+    const linhas = new Map<
+      string,
+      { funcao: string; turno: string; total: number; ferias: number; chave: boolean }
+    >();
+    for (const e of employees) {
+      if (e.status !== "ATIVO") continue;
+      if (!idsArea.has(e.area_id ?? "")) continue;
+      if (areaId !== TODOS && e.area_id !== areaId) continue;
+      if (shiftId !== TODOS && e.shift_id !== shiftId) continue;
+      if (functionId !== TODOS && e.function_id !== functionId) continue;
+      const key = `${e.function_id}|${e.shift_id}`;
+      const f = funcoes.find((x) => x.id === e.function_id);
+      const linha =
+        linhas.get(key) ??
+        {
+          funcao: f?.nome ?? "—",
+          turno: nomeTurno(e.shift_id),
+          total: 0,
+          ferias: 0,
+          chave: !!f?.funcao_chave,
+        };
+      linha.total += 1;
+      const emFerias = ativas.some(
+        (v) => v.employee_id === e.id && sobrepoe(v, { inicio: inicioMes, fim: fimMes }),
+      );
+      if (emFerias) linha.ferias += 1;
+      linhas.set(key, linha);
+    }
+    return [...linhas.values()].sort(
+      (a, b) => b.total - b.ferias - (a.total - a.ferias) || a.funcao.localeCompare(b.funcao),
+    );
+  }, [employees, areasVisiveis, areaId, shiftId, functionId, funcoes, ativas, mes, turnos]);
 
-  if (loading || !session) return null;
+  const carregando = cat.isLoading || fer.isLoading || mov.isLoading || emp.isLoading;
+
+  const indicadores: { titulo: string; valor: number; tom?: string; drill: Drilldown }[] = [
+    { titulo: "Férias no filtro", valor: ativas.length, drill: { titulo: "Férias no filtro", tipo: "ferias", itens: ativas } },
+    {
+      titulo: "Férias críticas",
+      valor: criticas.length,
+      tom: "text-destructive",
+      drill: { titulo: "Férias com conflito crítico ou bloqueio", tipo: "ferias", itens: criticas },
+    },
+    {
+      titulo: "Funções-chave impactadas",
+      valor: chaveImpactadas.length,
+      tom: "text-amber-500",
+      drill: { titulo: "Férias de funções-chave", tipo: "ferias", itens: chaveImpactadas },
+    },
+    {
+      titulo: "Férias sem substituto",
+      valor: semSubstituto.length,
+      drill: { titulo: "Férias sem substituto indicado", tipo: "ferias", itens: semSubstituto },
+    },
+    {
+      titulo: "Movimentações previstas",
+      valor: previstas.length,
+      drill: { titulo: "Movimentações previstas", tipo: "movimentacoes", itens: previstas },
+    },
+    {
+      titulo: "Movimentação durante férias",
+      valor: movDuranteFerias.length,
+      tom: "text-destructive",
+      drill: {
+        titulo: "Férias com movimentação no período",
+        tipo: "ferias",
+        itens: movDuranteFerias,
+      },
+    },
+    {
+      titulo: "Pendências de aprovação",
+      valor: pendencias.length,
+      drill: { titulo: "Movimentações pendentes de aprovação", tipo: "movimentacoes", itens: pendencias },
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b bg-sidebar text-sidebar-foreground">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">Controle Gerencial de Férias</h1>
-            <p className="text-sm opacity-80">
-              Programação por área e função · alerta automático para funções-chave
-            </p>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="opacity-80">{session.user.email}</span>
-            <Button size="sm" variant="secondary" onClick={sair}>
-              <LogOut className="mr-1 h-4 w-4" /> Sair
-            </Button>
-          </div>
+    <AppShell>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">Painel gerencial</h1>
+          <p className="text-sm text-muted-foreground">
+            Indicadores clicáveis de férias, conflitos e movimentações da operação.
+          </p>
         </div>
-      </header>
 
-      <main className="mx-auto max-w-7xl space-y-6 px-4 py-6">
-        {isLoading ? (
-          <p className="text-muted-foreground">Carregando base de colaboradores…</p>
+        <Card>
+          <CardContent className="grid gap-3 py-4 sm:grid-cols-3 lg:grid-cols-7">
+            <Filtro label="Unidade" value={unidade} onChange={setUnidade} options={unidades.map((u) => ({ v: u, l: u }))} />
+            <Filtro
+              label="Área"
+              value={areaId}
+              onChange={setAreaId}
+              options={areasVisiveis.map((a) => ({ v: a.id, l: a.nome }))}
+            />
+            <Filtro
+              label="Turno"
+              value={shiftId}
+              onChange={setShiftId}
+              options={turnos.map((t) => ({ v: t.id, l: t.nome }))}
+            />
+            <Filtro
+              label="Função"
+              value={functionId}
+              onChange={setFunctionId}
+              options={funcoes.map((f) => ({ v: f.id, l: f.nome }))}
+            />
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Mês</Label>
+              <Input type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
+            </div>
+            <Filtro
+              label="Status"
+              value={status}
+              onChange={setStatus}
+              options={["PLANEJADA", "APROVADA", "EM_ANDAMENTO", "CONCLUIDA", "CANCELADA"].map((s) => ({
+                v: s,
+                l: humaniza(s),
+              }))}
+            />
+            <Filtro
+              label="Criticidade"
+              value={criticidade}
+              onChange={setCriticidade}
+              options={["INFORMATIVO", "ATENCAO", "CRITICO", "BLOQUEIO"].map((s) => ({
+                v: s,
+                l: humaniza(s),
+              }))}
+            />
+          </CardContent>
+        </Card>
+
+        {carregando ? (
+          <p className="text-sm text-muted-foreground">Carregando indicadores…</p>
         ) : (
           <>
-            <section className="grid gap-4 sm:grid-cols-4">
-              <Indicador titulo="Colaboradores" valor={colaboradores.length} />
-              <Indicador titulo="Férias programadas" valor={registros.length} />
-              <Indicador
-                titulo="Funções-chave"
-                valor={colaboradores.filter((c) => c.funcao_chave).length}
-                detalhe="Operadores de empilhadeira"
-              />
-              <Indicador
-                titulo="Conflitos"
-                valor={registros.filter((r) => severidadeDe(mapa.get(r.id)) !== "ok").length}
-                critico
-              />
-            </section>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {indicadores.map((i) => (
+                <button
+                  key={i.titulo}
+                  onClick={() => setDrill(i.drill)}
+                  className="rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent/40"
+                >
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{i.titulo}</p>
+                  <p className={`mt-1 text-2xl font-semibold ${i.tom ?? "text-foreground"}`}>
+                    {i.valor}
+                  </p>
+                </button>
+              ))}
+            </div>
 
-            <AlertasPanel registros={registros} mapa={mapa} onSelecionar={setArea} />
-
-            <section className="space-y-4">
-              <div className="flex flex-wrap gap-2">
-                {areas.map((a) => {
-                  const n = criticosPorArea.get(a) ?? 0;
-                  return (
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Férias por mês</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {porMes.length === 0 && <p className="text-sm text-muted-foreground">Sem dados.</p>}
+                  {porMes.map(([m, itens]) => (
                     <button
-                      key={a}
-                      onClick={() => setArea(a)}
-                      className={`inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
-                        a === area
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-border bg-card hover:bg-secondary"
-                      }`}
+                      key={m}
+                      onClick={() =>
+                        setDrill({ titulo: `Férias iniciadas em ${m}`, tipo: "ferias", itens })
+                      }
+                      className="flex w-full items-center gap-3 rounded-md px-2 py-1 text-left hover:bg-accent"
                     >
-                      {a}
-                      {n > 0 && (
-                        <Badge variant="destructive" className="h-5 px-1.5 text-[11px]">
-                          {n}
-                        </Badge>
-                      )}
+                      <span className="w-16 text-xs text-muted-foreground">{m}</span>
+                      <span className="h-2 flex-1 overflow-hidden rounded bg-muted">
+                        <span
+                          className="block h-full bg-primary"
+                          style={{
+                            width: `${Math.min(100, (itens.length / Math.max(1, ativas.length)) * 100 * 3)}%`,
+                          }}
+                        />
+                      </span>
+                      <span className="w-8 text-right text-xs font-medium">{itens.length}</span>
                     </button>
-                  );
-                })}
-              </div>
+                  ))}
+                </CardContent>
+              </Card>
 
-              <div className="relative max-w-sm">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                  className="pl-8"
-                  placeholder="Buscar por nome, função ou RE"
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                />
-              </div>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Férias por área</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {porArea.length === 0 && <p className="text-sm text-muted-foreground">Sem dados.</p>}
+                  {porArea.map(([id, itens]) => (
+                    <button
+                      key={id}
+                      onClick={() =>
+                        setDrill({ titulo: `Férias — ${nomeArea(id)}`, tipo: "ferias", itens })
+                      }
+                      className="flex w-full items-center gap-3 rounded-md px-2 py-1 text-left hover:bg-accent"
+                    >
+                      <span className="w-40 truncate text-xs text-muted-foreground">
+                        {nomeArea(id)}
+                      </span>
+                      <span className="h-2 flex-1 overflow-hidden rounded bg-muted">
+                        <span
+                          className="block h-full bg-primary"
+                          style={{
+                            width: `${Math.min(100, (itens.length / Math.max(1, ativas.length)) * 100 * 3)}%`,
+                          }}
+                        />
+                      </span>
+                      <span className="w-8 text-right text-xs font-medium">{itens.length}</span>
+                    </button>
+                  ))}
+                </CardContent>
+              </Card>
+            </div>
 
-              <AreaTabela
-                colaboradores={daArea}
-                registros={registros.filter((r) => r.colaborador.area === area)}
-                mapa={mapa}
-                onLancar={(c) => setDialogo({ colaborador: c, registro: null })}
-                onEditar={(c, r) => setDialogo({ colaborador: c, registro: r })}
-                onExcluir={async (r) => {
-                  await excluir.mutateAsync(r.id);
-                  toast.success("Período removido.");
-                }}
-              />
-            </section>
+            <Card>
+              <CardHeader className="flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">
+                  Capacidade disponível por função e turno {mes ? `(${mes})` : "(mês atual)"}
+                </CardTitle>
+                <Button variant="ghost" size="sm" onClick={() => setMes("")}>
+                  Limpar mês
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-xs uppercase text-muted-foreground">
+                      <tr className="border-b border-border">
+                        <th className="py-2 text-left font-medium">Função</th>
+                        <th className="py-2 text-left font-medium">Turno</th>
+                        <th className="py-2 text-right font-medium">Efetivo</th>
+                        <th className="py-2 text-right font-medium">Em férias</th>
+                        <th className="py-2 text-right font-medium">Disponível</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {capacidade.map((l) => {
+                        const disp = l.total - l.ferias;
+                        return (
+                          <tr key={`${l.funcao}|${l.turno}`} className="border-b border-border/60">
+                            <td className="py-1.5">
+                              {l.funcao}{" "}
+                              {l.chave && (
+                                <Badge variant="secondary" className="ml-1 text-[10px]">
+                                  chave
+                                </Badge>
+                              )}
+                            </td>
+                            <td className="py-1.5 text-muted-foreground">{l.turno}</td>
+                            <td className="py-1.5 text-right">{l.total}</td>
+                            <td className="py-1.5 text-right">{l.ferias}</td>
+                            <td
+                              className={`py-1.5 text-right font-medium ${
+                                disp <= 0 ? "text-destructive" : disp === 1 ? "text-amber-500" : ""
+                              }`}
+                            >
+                              {disp}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {capacidade.length === 0 && (
+                        <tr>
+                          <td colSpan={5} className="py-3 text-sm text-muted-foreground">
+                            Sem efetivo para os filtros selecionados.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
           </>
         )}
-      </main>
+      </div>
 
-      <FeriasDialog
-        aberto={dialogo !== null}
-        onOpenChange={(v) => !v && setDialogo(null)}
-        colaborador={dialogo?.colaborador ?? null}
-        registro={dialogo?.registro ?? null}
-        registros={registros}
+      <DrilldownDialog
+        data={drill}
+        onClose={() => setDrill(null)}
+        nomeArea={nomeArea}
+        nomeTurno={nomeTurno}
+        nomeFuncao={nomeFuncao}
       />
-    </div>
+    </AppShell>
   );
 }
 
-function Indicador({
-  titulo,
-  valor,
-  detalhe,
-  critico,
+function Filtro({
+  label,
+  value,
+  onChange,
+  options,
 }: {
-  titulo: string;
-  valor: number;
-  detalhe?: string;
-  critico?: boolean;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { v: string; l: string }[];
 }) {
   return (
-    <div className="rounded-lg border bg-card p-4">
-      <p className="text-sm text-muted-foreground">{titulo}</p>
-      <p className={`text-3xl font-semibold ${critico && valor > 0 ? "text-critical" : "text-foreground"}`}>
-        {valor}
-      </p>
-      {detalhe && <p className="text-xs text-muted-foreground">{detalhe}</p>}
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={TODOS}>Todos</SelectItem>
+          {options.map((o) => (
+            <SelectItem key={o.v} value={o.v}>
+              {o.l}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
