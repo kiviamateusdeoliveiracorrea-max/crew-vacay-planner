@@ -64,6 +64,7 @@ export function MovimentacaoDialog({
   const [dataFim, setDataFim] = useState("");
   const [motivo, setMotivo] = useState("");
   const [observacao, setObservacao] = useState("");
+  const [status, setStatus] = useState<Movement["status"]>("PENDENTE");
 
   useEffect(() => {
     if (!open) return;
@@ -76,8 +77,10 @@ export function MovimentacaoDialog({
     setDataFim(registro?.data_fim ?? "");
     setMotivo(registro?.motivo ?? "");
     setObservacao(registro?.observacao ?? "");
+    setStatus(registro?.status ?? "PENDENTE");
     setBusca("");
   }, [open, registro]);
+
 
   const colaborador = employees.find((e) => e.id === employeeId) ?? null;
   const tipoTravado = ehDefinitivo(tipo) || ehTemporario(tipo);
@@ -134,16 +137,22 @@ export function MovimentacaoDialog({
     );
   }, [colaborador, movimentacoes, temporaria, dataEfetiva, dataFim, registro?.id]);
 
+  const areaOrigem = registro?.area_origem_id ?? vigente?.areaId ?? colaborador?.area_id ?? null;
+  const turnoOrigem = registro?.shift_origem_id ?? vigente?.shiftId ?? colaborador?.shift_id ?? null;
+
   const erros = useMemo(
     () =>
       validaMovimentacao({
         tipo,
         areaDestinoId: areaDestino || null,
+        areaOrigemId: areaOrigem,
+        shiftOrigemId: turnoOrigem,
+        shiftDestinoId: turnoDestino || null,
         dataEfetiva,
         temporaria,
         dataFim: dataFim || null,
       }),
-    [tipo, areaDestino, dataEfetiva, temporaria, dataFim],
+    [tipo, areaDestino, areaOrigem, turnoOrigem, turnoDestino, dataEfetiva, temporaria, dataFim],
   );
 
   const conflitaFerias = useMemo(() => {
@@ -163,6 +172,9 @@ export function MovimentacaoDialog({
     const form = normalizaPorTipo({
       tipo,
       areaDestinoId: areaDestino || null,
+      areaOrigemId: areaOrigem,
+      shiftOrigemId: turnoOrigem,
+      shiftDestinoId: turnoDestino || null,
       dataEfetiva,
       temporaria,
       dataFim: dataFim || null,
@@ -182,16 +194,17 @@ export function MovimentacaoDialog({
         employee_id: colaborador.id,
         re: colaborador.re ?? "",
         // origem = lotação vigente na data efetiva (o banco recalcula se vier nula)
-        area_origem_id: registro?.area_origem_id ?? vigente?.areaId ?? colaborador.area_id,
-        shift_origem_id: registro?.shift_origem_id ?? vigente?.shiftId ?? colaborador.shift_id,
+        area_origem_id: areaOrigem,
+        shift_origem_id: turnoOrigem,
         area_destino_id: form.areaDestinoId,
-        shift_destino_id: turnoDestino || colaborador.shift_id,
+        shift_destino_id: turnoDestino || turnoOrigem,
         data_efetiva: form.dataEfetiva,
         tipo: form.tipo,
         temporaria: form.temporaria,
         data_fim: form.dataFim,
         motivo: motivo || null,
         observacao: observacao || null,
+        status,
       } as never);
       toast.success("Movimentação registrada. Conflitos recalculados.");
       onOpenChange(false);
@@ -199,6 +212,8 @@ export function MovimentacaoDialog({
       toast.error(e instanceof Error ? e.message : "Não foi possível salvar.");
     }
   }
+
+
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -233,6 +248,22 @@ export function MovimentacaoDialog({
               </SelectContent>
             </Select>
           </div>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <Label>RE / matrícula</Label>
+              <Input value={colaborador?.re ?? ""} readOnly disabled placeholder="—" />
+            </div>
+            <div className="space-y-1">
+              <Label>Setor de origem</Label>
+              <Input value={nomeArea(areaOrigem)} readOnly disabled />
+            </div>
+            <div className="space-y-1">
+              <Label>Turno de origem</Label>
+              <Input value={nomeTurno(turnoOrigem)} readOnly disabled />
+            </div>
+          </div>
+
 
           {colaborador && vigente && definitiva && (
             <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground">
@@ -311,7 +342,34 @@ export function MovimentacaoDialog({
               <Label>Data efetiva</Label>
               <Input type="date" value={dataEfetiva} onChange={(e) => setDataEfetiva(e.target.value)} />
             </div>
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <Select value={status} onValueChange={(v) => setStatus(v as Movement["status"])}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(["PENDENTE", "APROVADA", "REJEITADA", "CANCELADA"] as const).map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {humaniza(s)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Somente movimentações aprovadas alteram a alocação.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label>Aprovador</Label>
+              <Input
+                value={registro?.aprovador_id ? "Registrado na aprovação" : "Pendente de decisão"}
+                readOnly
+                disabled
+              />
+            </div>
           </div>
+
 
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-border p-3">
             <Switch
