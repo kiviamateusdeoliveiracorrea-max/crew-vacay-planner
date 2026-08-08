@@ -101,39 +101,34 @@ export function FeriasFormDialog({
 
   const previa = useMemo(() => {
     if (!colaborador || !inicio || !fim) return [];
-    const avisos: string[] = [];
-    const periodo = { inicio, fim };
-    for (const v of ferias) {
-      if (v.id === registro?.id) continue;
-      if (v.status === "CANCELADA") continue;
-      if (!v.employee) continue;
-      if (!sobrepoe(v, periodo)) continue;
-      if (v.employee.id === colaborador.id) {
-        avisos.push("Este colaborador já possui férias sobrepostas no período.");
-        continue;
-      }
-      if (v.employee.function_id !== colaborador.function_id) continue;
-      const mesmaArea = (v.area_id_snapshot ?? v.employee.area_id) === colaborador.area_id;
-      avisos.push(
-        mesmaArea
-          ? `Conflito na mesma área: ${v.employee.nome} (${nomeArea(colaborador.area_id)}).`
-          : `Mesma função em outra área: ${v.employee.nome} (${nomeArea(v.area_id_snapshot ?? v.employee.area_id)}).`,
-      );
-    }
-    if (substituto) {
-      const sobreposicaoSub = ferias.some(
-        (v) =>
-          v.status !== "CANCELADA" &&
-          v.employee_id === substituto &&
-          sobrepoe(v, periodo) &&
-          v.id !== registro?.id,
-      );
-      if (sobreposicaoSub) avisos.push("O substituto indicado também estará de férias no período.");
-    } else if (funcoes.find((f) => f.id === colaborador.function_id)?.funcao_chave) {
-      avisos.push("Função-chave sem substituto indicado.");
-    }
-    return avisos;
-  }, [colaborador, inicio, fim, ferias, registro, substituto, funcoes, nomeArea]);
+    return avaliarFerias(
+      { employees, funcoes, areas, turnos, movimentacoes, regras, ferias },
+      {
+        ...(registro?.id ? { id: registro.id } : {}),
+        employee_id: colaborador.id,
+        inicio,
+        fim,
+        status,
+        substituto_employee_id: substituto || null,
+        substituto_nome: null,
+      },
+    );
+  }, [
+    colaborador,
+    inicio,
+    fim,
+    status,
+    substituto,
+    employees,
+    funcoes,
+    areas,
+    turnos,
+    movimentacoes,
+    regras,
+    ferias,
+    registro,
+  ]);
+
 
   async function submeter() {
     if (!employeeId || !inicio || !fim) {
