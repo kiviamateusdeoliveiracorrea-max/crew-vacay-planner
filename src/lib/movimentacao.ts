@@ -115,6 +115,9 @@ export type FormMovimentacao = {
   dataEfetiva: string;
   temporaria: boolean;
   dataFim: string | null;
+  areaOrigemId?: string | null;
+  shiftOrigemId?: string | null;
+  shiftDestinoId?: string | null;
 };
 
 /** Mesmas regras aplicadas pelo banco, para feedback imediato no formulário. */
@@ -129,11 +132,20 @@ export function validaMovimentacao(form: FormMovimentacao): string[] {
     erros.push("Empréstimo temporário e cobertura de férias são sempre temporários.");
   }
   if (form.temporaria && !form.dataFim) erros.push("Movimentação temporária exige data final.");
-  if (form.dataFim && form.dataEfetiva && form.dataFim < form.dataEfetiva) {
-    erros.push("A data final não pode ser anterior à data efetiva.");
+  if (form.dataFim && form.dataEfetiva && form.dataFim <= form.dataEfetiva) {
+    erros.push("A data final deve ser posterior à data efetiva.");
+  }
+  if (
+    form.areaOrigemId &&
+    form.areaDestinoId &&
+    form.areaOrigemId === form.areaDestinoId &&
+    (form.shiftDestinoId ?? form.shiftOrigemId ?? null) === (form.shiftOrigemId ?? null)
+  ) {
+    erros.push("Origem e destino não podem ser iguais (mesmo setor e turno).");
   }
   return erros;
 }
+
 
 /** Normaliza o formulário conforme o tipo (espelha o gatilho do banco). */
 export function normalizaPorTipo<T extends FormMovimentacao>(form: T): T {
