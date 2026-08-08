@@ -76,21 +76,24 @@ export function useCatalogos() {
   return useQuery({
     queryKey: ["catalogos"],
     queryFn: async () => {
-      const [areas, turnos, funcoes, regras] = await Promise.all([
+      const [areas, turnos, funcoes, regras, unidades] = await Promise.all([
         supabase.from("areas").select("*").order("nome"),
         supabase.from("shifts").select("*").order("nome"),
         supabase.from("functions").select("*").order("nome"),
         supabase.from("coverage_rules").select("*"),
+        supabase.from("units").select("*").order("nome"),
       ]);
       if (areas.error) throw areas.error;
       if (turnos.error) throw turnos.error;
       if (funcoes.error) throw funcoes.error;
       if (regras.error) throw regras.error;
+      if (unidades.error) throw unidades.error;
       return {
         areas: (areas.data ?? []) as Area[],
         turnos: (turnos.data ?? []) as Turno[],
         funcoes: (funcoes.data ?? []) as Funcao[],
         regras: (regras.data ?? []) as CoverageRule[],
+        unidades: (unidades.data ?? []) as Unidade[],
       };
     },
   });
