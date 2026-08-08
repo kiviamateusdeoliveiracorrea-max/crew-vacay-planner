@@ -52,12 +52,18 @@ function AdminPage() {
       return (profiles ?? []).map((p) => ({
         ...p,
         papeis: (roles ?? []).filter((r) => r.user_id === p.id).map((r) => r.role as Papel),
-        areas: (perms ?? []).filter((r) => r.user_id === p.id).map((r) => r.area_id),
+        areas: (perms ?? [])
+          .filter((r) => r.user_id === p.id && r.area_id)
+          .map((r) => r.area_id as string),
+        unidades: (perms ?? [])
+          .filter((r) => r.user_id === p.id && !r.area_id && r.unit_id)
+          .map((r) => r.unit_id as string),
       }));
     },
   });
 
   const areas = cat.data?.areas ?? [];
+  const unidades = cat.data?.unidades ?? [];
 
   async function alternarPapel(userId: string, papel: Papel, ativo: boolean) {
     const q = ativo
@@ -72,9 +78,30 @@ function AdminPage() {
     }
   }
 
-  async function alternarArea(userId: string, areaId: string, ativo: boolean) {
+  async function alternarUnidade(userId: string, unitId: string, ativo: boolean) {
     const q = ativo
-      ? supabase.from("user_area_permissions").insert({ user_id: userId, area_id: areaId })
+      ? supabase
+          .from("user_area_permissions")
+          .insert({ user_id: userId, unit_id: unitId, area_id: null })
+      : supabase
+          .from("user_area_permissions")
+          .delete()
+          .eq("user_id", userId)
+          .eq("unit_id", unitId)
+          .is("area_id", null);
+    const { error } = await q;
+    if (error) toast.error(error.message);
+    else {
+      qc.invalidateQueries({ queryKey: ["usuarios"] });
+      qc.invalidateQueries({ queryKey: ["perfil"] });
+    }
+  }
+
+  async function alternarArea(userId: string, areaId: string, unitId: string | null, ativo: boolean) {
+    const q = ativo
+      ? supabase
+          .from("user_area_permissions")
+          .insert({ user_id: userId, area_id: areaId, unit_id: unitId })
       : supabase
           .from("user_area_permissions")
           .delete()
@@ -87,6 +114,7 @@ function AdminPage() {
       qc.invalidateQueries({ queryKey: ["perfil"] });
     }
   }
+
 
   if (!perfil.loading && !perfil.tem("ADMIN")) {
     return (
@@ -152,20 +180,47 @@ function AdminPage() {
 
                   <div>
                     <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+                      Unidades autorizadas (todas as áreas da unidade)
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {unidades.map((un) => (
+                        <label key={un.id} className="flex items-center gap-2 text-xs">
+                          <Checkbox
+                            checked={u.unidades.includes(un.id)}
+                            onCheckedChange={(c) => alternarUnidade(u.id, un.id, !!c)}
+                          />
+                          {un.nome}
+                        </label>
+                      ))}
+                      {unidades.length === 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          Nenhuma unidade cadastrada.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
                       Áreas autorizadas
                     </p>
                     <div className="flex flex-wrap gap-3">
                       {areas.map((a) => (
                         <label key={a.id} className="flex items-center gap-2 text-xs">
                           <Checkbox
-                            checked={u.areas.includes(a.id)}
-                            onCheckedChange={(c) => alternarArea(u.id, a.id, !!c)}
+                            checked={
+                              u.areas.includes(a.id) ||
+                              (!!a.unit_id && u.unidades.includes(a.unit_id))
+                            }
+                            disabled={!!a.unit_id && u.unidades.includes(a.unit_id)}
+                            onCheckedChange={(c) => alternarArea(u.id, a.id, a.unit_id, !!c)}
                           />
                           {a.nome}
                         </label>
                       ))}
                     </div>
                   </div>
+
                 </CardContent>
               </Card>
             ))}
