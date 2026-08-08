@@ -1,0 +1,1 @@
+DROP TRIGGER IF EXISTS trg_profiles_actor ON public.profiles;

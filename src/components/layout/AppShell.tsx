@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePerfil } from "@/hooks/useSistema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BootstrapAdmin } from "@/components/layout/BootstrapAdmin";
 
 const LINKS = [
   { to: "/", label: "Painel" },
@@ -12,7 +13,7 @@ const LINKS = [
   { to: "/movimentacoes", label: "Movimentações" },
   { to: "/importar", label: "Importar base", cadastro: true },
   { to: "/auditoria", label: "Auditoria", admin: true },
-  { to: "/admin", label: "Usuários", admin: true },
+  { to: "/admin", label: "Usuários e Acessos", admin: true },
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -88,6 +89,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             Sua conta ainda não possui um perfil atribuído. Peça a um administrador para liberar seu
             acesso e as áreas correspondentes.
           </p>
+          <BootstrapAdmin />
         </main>
       ) : (
         <main className="mx-auto max-w-[1400px] px-4 py-6">{children}</main>
