@@ -7,6 +7,12 @@ export function BootstrapAdmin() {
   const promover = usePromoverPrimeiroAdmin();
 
   if (diag.isLoading) return null;
+  if (diag.error)
+    return (
+      <p className="mt-6 text-xs text-destructive">
+        Diagnóstico indisponível: {(diag.error as Error).message}
+      </p>
+    );
   const d = diag.data;
   if (!d) return null;
 
