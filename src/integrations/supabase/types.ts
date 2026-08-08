@@ -677,24 +677,30 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ativo: boolean
           created_at: string
           email: string | null
           id: string
           nome: string | null
+          ultimo_acesso: string | null
           updated_at: string
         }
         Insert: {
+          ativo?: boolean
           created_at?: string
           email?: string | null
           id: string
           nome?: string | null
+          ultimo_acesso?: string | null
           updated_at?: string
         }
         Update: {
+          ativo?: boolean
           created_at?: string
           email?: string | null
           id?: string
           nome?: string | null
+          ultimo_acesso?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -762,6 +768,7 @@ export type Database = {
       user_area_permissions: {
         Row: {
           area_id: string | null
+          concedido_por: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -772,6 +779,7 @@ export type Database = {
         }
         Insert: {
           area_id?: string | null
+          concedido_por?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -782,6 +790,7 @@ export type Database = {
         }
         Update: {
           area_id?: string | null
+          concedido_por?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -1164,6 +1173,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_active_user: { Args: { _user_id: string }; Returns: boolean }
       is_manager: { Args: { _user_id: string }; Returns: boolean }
       recalc_related_conflicts: {
         Args: { _employee_id: string }
