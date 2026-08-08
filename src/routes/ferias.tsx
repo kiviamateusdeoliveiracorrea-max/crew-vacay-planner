@@ -13,6 +13,7 @@ import {
   useEmployees,
   useExcluirFerias,
   usePerfil,
+  useMovements,
   useReconhecerConflito,
   useVacations,
   type VacationFull,
@@ -51,6 +52,7 @@ function FeriasPage() {
   const cat = useCatalogos();
   const emp = useEmployees();
   const fer = useVacations();
+  const mov = useMovements();
   const perfil = usePerfil();
   const excluir = useExcluirFerias();
   const reconhecer = useReconhecerConflito();
