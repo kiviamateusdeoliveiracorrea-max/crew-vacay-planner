@@ -180,20 +180,47 @@ function AdminPage() {
 
                   <div>
                     <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+                      Unidades autorizadas (todas as áreas da unidade)
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      {unidades.map((un) => (
+                        <label key={un.id} className="flex items-center gap-2 text-xs">
+                          <Checkbox
+                            checked={u.unidades.includes(un.id)}
+                            onCheckedChange={(c) => alternarUnidade(u.id, un.id, !!c)}
+                          />
+                          {un.nome}
+                        </label>
+                      ))}
+                      {unidades.length === 0 && (
+                        <span className="text-xs text-muted-foreground">
+                          Nenhuma unidade cadastrada.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
                       Áreas autorizadas
                     </p>
                     <div className="flex flex-wrap gap-3">
                       {areas.map((a) => (
                         <label key={a.id} className="flex items-center gap-2 text-xs">
                           <Checkbox
-                            checked={u.areas.includes(a.id)}
-                            onCheckedChange={(c) => alternarArea(u.id, a.id, !!c)}
+                            checked={
+                              u.areas.includes(a.id) ||
+                              (!!a.unit_id && u.unidades.includes(a.unit_id))
+                            }
+                            disabled={!!a.unit_id && u.unidades.includes(a.unit_id)}
+                            onCheckedChange={(c) => alternarArea(u.id, a.id, a.unit_id, !!c)}
                           />
                           {a.nome}
                         </label>
                       ))}
                     </div>
                   </div>
+
                 </CardContent>
               </Card>
             ))}
