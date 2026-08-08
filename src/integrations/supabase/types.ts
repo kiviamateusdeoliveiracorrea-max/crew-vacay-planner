@@ -790,6 +790,14 @@ export type Database = {
         Args: { _data: string; _employee_id: string }
         Returns: string
       }
+      employee_definitive_area_on: {
+        Args: { _data: string; _employee_id: string }
+        Returns: string
+      }
+      employee_definitive_shift_on: {
+        Args: { _data: string; _employee_id: string }
+        Returns: string
+      }
       employee_shift_on: {
         Args: { _data: string; _employee_id: string }
         Returns: string
