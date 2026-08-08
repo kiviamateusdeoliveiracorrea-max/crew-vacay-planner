@@ -58,6 +58,7 @@ function AdminPage() {
   });
 
   const areas = cat.data?.areas ?? [];
+  const unidades = cat.data?.unidades ?? [];
 
   async function alternarPapel(userId: string, papel: Papel, ativo: boolean) {
     const q = ativo
@@ -72,9 +73,30 @@ function AdminPage() {
     }
   }
 
-  async function alternarArea(userId: string, areaId: string, ativo: boolean) {
+  async function alternarUnidade(userId: string, unitId: string, ativo: boolean) {
     const q = ativo
-      ? supabase.from("user_area_permissions").insert({ user_id: userId, area_id: areaId })
+      ? supabase
+          .from("user_area_permissions")
+          .insert({ user_id: userId, unit_id: unitId, area_id: null })
+      : supabase
+          .from("user_area_permissions")
+          .delete()
+          .eq("user_id", userId)
+          .eq("unit_id", unitId)
+          .is("area_id", null);
+    const { error } = await q;
+    if (error) toast.error(error.message);
+    else {
+      qc.invalidateQueries({ queryKey: ["usuarios"] });
+      qc.invalidateQueries({ queryKey: ["perfil"] });
+    }
+  }
+
+  async function alternarArea(userId: string, areaId: string, unitId: string | null, ativo: boolean) {
+    const q = ativo
+      ? supabase
+          .from("user_area_permissions")
+          .insert({ user_id: userId, area_id: areaId, unit_id: unitId })
       : supabase
           .from("user_area_permissions")
           .delete()
@@ -87,6 +109,7 @@ function AdminPage() {
       qc.invalidateQueries({ queryKey: ["perfil"] });
     }
   }
+
 
   if (!perfil.loading && !perfil.tem("ADMIN")) {
     return (
