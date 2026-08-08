@@ -33,14 +33,15 @@ export function useSalvarFerias() {
       substituto: string | null;
       observacao: string | null;
     }) => {
-      if (input.id) {
-        const { id, ...rest } = input;
+      const { id, ...rest } = input;
+      if (id) {
         const { error } = await supabase.from("ferias").update(rest).eq("id", id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("ferias").insert({ ...input, status: "PLANEJADA" });
+        const { error } = await supabase.from("ferias").insert({ ...rest, status: "PLANEJADA" });
         if (error) throw error;
       }
+
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["controle-ferias"] }),
   });
