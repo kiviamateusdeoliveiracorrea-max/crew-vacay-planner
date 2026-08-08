@@ -24,15 +24,26 @@ export function usePerfil() {
     queryKey: ["perfil", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const [{ data: roles, error: e1 }, { data: perms, error: e2 }] = await Promise.all([
-        supabase.from("user_roles").select("role").eq("user_id", user!.id),
-        supabase.from("user_area_permissions").select("area_id").eq("user_id", user!.id),
-      ]);
+      const [{ data: roles, error: e1 }, { data: perms, error: e2 }, { data: areas, error: e3 }] =
+        await Promise.all([
+          supabase.from("user_roles").select("role").eq("user_id", user!.id),
+          supabase.from("user_area_permissions").select("area_id, unit_id").eq("user_id", user!.id),
+          supabase.from("areas").select("id, unit_id"),
+        ]);
       if (e1) throw e1;
       if (e2) throw e2;
+      if (e3) throw e3;
+
+      const unidades = (perms ?? []).filter((p) => !p.area_id && p.unit_id).map((p) => p.unit_id!);
+      const diretas = (perms ?? []).filter((p) => p.area_id).map((p) => p.area_id!);
+      const porUnidade = (areas ?? [])
+        .filter((a) => a.unit_id && unidades.includes(a.unit_id))
+        .map((a) => a.id);
+
       return {
         papeis: (roles ?? []).map((r) => r.role as Papel),
-        areas: (perms ?? []).map((p) => p.area_id),
+        areas: Array.from(new Set([...diretas, ...porUnidade])),
+        unidades,
       };
     },
   });
@@ -40,22 +51,26 @@ export function usePerfil() {
   const papeis = q.data?.papeis ?? [];
   const tem = (p: Papel) => papeis.includes(p);
   const areasPermitidas = q.data?.areas ?? [];
-  const gestor = tem("ADMIN") || tem("ANALISTA") || tem("GERENTE");
+  const unidadesPermitidas = q.data?.unidades ?? [];
+  const irrestrito = tem("ADMIN") || tem("ANALISTA");
+  const gestor = irrestrito || tem("GERENTE");
 
   return {
     loading: loading || q.isLoading,
     papeis,
     areasPermitidas,
+    unidadesPermitidas,
     tem,
     semPapel: !!user && !q.isLoading && papeis.length === 0,
     podeManterCadastro: tem("ADMIN") || tem("ANALISTA"),
     podeAprovar: tem("ADMIN") || tem("GERENTE") || tem("COORDENADOR"),
     podeVerAuditoria: tem("ADMIN"),
     podeVerArea: (areaId: string | null) =>
-      gestor || (!!areaId && areasPermitidas.includes(areaId)),
+      irrestrito || (!!areaId && areasPermitidas.includes(areaId)),
     gestor,
   };
 }
+
 
 export function useCatalogos() {
   return useQuery({
