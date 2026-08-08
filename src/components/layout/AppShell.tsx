@@ -6,6 +6,8 @@ import { usePerfil } from "@/hooks/useSistema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BootstrapAdmin } from "@/components/layout/BootstrapAdmin";
+import { SolicitarAcesso } from "@/components/layout/SolicitarAcesso";
+
 
 const LINKS = [
   { to: "/", label: "Painel" },
