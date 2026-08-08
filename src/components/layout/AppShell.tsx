@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePerfil } from "@/hooks/useSistema";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { BootstrapAdmin } from "@/components/layout/BootstrapAdmin";
 
 const LINKS = [
   { to: "/", label: "Painel" },
