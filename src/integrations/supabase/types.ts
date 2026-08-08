@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           area_id: string | null
           created_at: string
+          created_by: string | null
           decidido_em: string | null
           decidido_por: string | null
           entidade: string
@@ -27,10 +28,12 @@ export type Database = {
           solicitado_por: string | null
           status: Database["public"]["Enums"]["approval_status"]
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           area_id?: string | null
           created_at?: string
+          created_by?: string | null
           decidido_em?: string | null
           decidido_por?: string | null
           entidade: string
@@ -40,10 +43,12 @@ export type Database = {
           solicitado_por?: string | null
           status?: Database["public"]["Enums"]["approval_status"]
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           area_id?: string | null
           created_at?: string
+          created_by?: string | null
           decidido_em?: string | null
           decidido_por?: string | null
           entidade?: string
@@ -53,6 +58,7 @@ export type Database = {
           solicitado_por?: string | null
           status?: Database["public"]["Enums"]["approval_status"]
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -68,28 +74,45 @@ export type Database = {
         Row: {
           ativo: boolean
           created_at: string
+          created_by: string | null
           id: string
           nome: string
           unidade: string
+          unit_id: string | null
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           ativo?: boolean
           created_at?: string
+          created_by?: string | null
           id?: string
           nome: string
           unidade?: string
+          unit_id?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           ativo?: boolean
           created_at?: string
+          created_by?: string | null
           id?: string
           nome?: string
           unidade?: string
+          unit_id?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "areas_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       audit_log: {
         Row: {
@@ -130,36 +153,45 @@ export type Database = {
       coverage_rules: {
         Row: {
           area_id: string | null
+          ativo: boolean
           cobertura_area_id: string | null
           created_at: string
+          created_by: string | null
           function_id: string | null
           id: string
           max_ferias_simultaneas: number
           min_presentes: number
           shift_id: string | null
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           area_id?: string | null
+          ativo?: boolean
           cobertura_area_id?: string | null
           created_at?: string
+          created_by?: string | null
           function_id?: string | null
           id?: string
           max_ferias_simultaneas?: number
           min_presentes?: number
           shift_id?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           area_id?: string | null
+          ativo?: boolean
           cobertura_area_id?: string | null
           created_at?: string
+          created_by?: string | null
           function_id?: string | null
           id?: string
           max_ferias_simultaneas?: number
           min_presentes?: number
           shift_id?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -212,6 +244,7 @@ export type Database = {
           temporaria: boolean
           tipo: Database["public"]["Enums"]["movement_type"]
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           aprovador_id?: string | null
@@ -232,6 +265,7 @@ export type Database = {
           temporaria?: boolean
           tipo: Database["public"]["Enums"]["movement_type"]
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           aprovador_id?: string | null
@@ -252,6 +286,7 @@ export type Database = {
           temporaria?: boolean
           tipo?: Database["public"]["Enums"]["movement_type"]
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -295,6 +330,7 @@ export type Database = {
         Row: {
           area_id: string | null
           created_at: string
+          created_by: string | null
           data_admissao: string | null
           data_desligamento: string | null
           function_id: string | null
@@ -307,10 +343,12 @@ export type Database = {
           status: Database["public"]["Enums"]["employee_status"]
           unidade: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           area_id?: string | null
           created_at?: string
+          created_by?: string | null
           data_admissao?: string | null
           data_desligamento?: string | null
           function_id?: string | null
@@ -323,10 +361,12 @@ export type Database = {
           status?: Database["public"]["Enums"]["employee_status"]
           unidade?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           area_id?: string | null
           created_at?: string
+          created_by?: string | null
           data_admissao?: string | null
           data_desligamento?: string | null
           function_id?: string | null
@@ -339,6 +379,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["employee_status"]
           unidade?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -368,26 +409,32 @@ export type Database = {
         Row: {
           ativo: boolean
           created_at: string
+          created_by: string | null
           funcao_chave: boolean
           id: string
           nome: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           ativo?: boolean
           created_at?: string
+          created_by?: string | null
           funcao_chave?: boolean
           id?: string
           nome: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           ativo?: boolean
           created_at?: string
+          created_by?: string | null
           funcao_chave?: boolean
           id?: string
           nome?: string
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -403,8 +450,10 @@ export type Database = {
           mapeamento: Json
           resumo: Json
           status: Database["public"]["Enums"]["import_status"]
+          template_id: string | null
           total_linhas: number
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           aba?: string | null
@@ -417,8 +466,10 @@ export type Database = {
           mapeamento?: Json
           resumo?: Json
           status?: Database["public"]["Enums"]["import_status"]
+          template_id?: string | null
           total_linhas?: number
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           aba?: string | null
@@ -431,37 +482,20 @@ export type Database = {
           mapeamento?: Json
           resumo?: Json
           status?: Database["public"]["Enums"]["import_status"]
+          template_id?: string | null
           total_linhas?: number
           updated_at?: string
+          updated_by?: string | null
         }
-        Relationships: []
-      }
-      import_mappings: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          mapeamento: Json
-          nome: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          mapeamento: Json
-          nome: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          mapeamento?: Json
-          nome?: string
-          updated_at?: string
-        }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "import_batches_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "import_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       import_rows: {
         Row: {
@@ -470,6 +504,7 @@ export type Database = {
           batch_id: string
           classificacao: Database["public"]["Enums"]["import_row_class"]
           created_at: string
+          created_by: string | null
           dados: Json
           diferencas: Json
           employee_id: string | null
@@ -478,6 +513,8 @@ export type Database = {
           linha: number
           setor_decisao: string | null
           setor_decisao_fim: string | null
+          updated_at: string
+          updated_by: string | null
         }
         Insert: {
           aplicado?: boolean
@@ -485,6 +522,7 @@ export type Database = {
           batch_id: string
           classificacao: Database["public"]["Enums"]["import_row_class"]
           created_at?: string
+          created_by?: string | null
           dados: Json
           diferencas?: Json
           employee_id?: string | null
@@ -493,6 +531,8 @@ export type Database = {
           linha: number
           setor_decisao?: string | null
           setor_decisao_fim?: string | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           aplicado?: boolean
@@ -500,6 +540,7 @@ export type Database = {
           batch_id?: string
           classificacao?: Database["public"]["Enums"]["import_row_class"]
           created_at?: string
+          created_by?: string | null
           dados?: Json
           diferencas?: Json
           employee_id?: string | null
@@ -508,6 +549,8 @@ export type Database = {
           linha?: number
           setor_decisao?: string | null
           setor_decisao_fim?: string | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
@@ -522,6 +565,112 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_templates: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          mapeamento: Json
+          nome: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mapeamento: Json
+          nome: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          mapeamento?: Json
+          nome?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      job_openings: {
+        Row: {
+          area_id: string | null
+          codigo: string
+          created_at: string
+          created_by: string | null
+          function_id: string | null
+          id: string
+          motivo: string | null
+          observacao: string | null
+          previsao_preenchimento: string | null
+          quantidade: number
+          shift_id: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          area_id?: string | null
+          codigo: string
+          created_at?: string
+          created_by?: string | null
+          function_id?: string | null
+          id?: string
+          motivo?: string | null
+          observacao?: string | null
+          previsao_preenchimento?: string | null
+          quantidade?: number
+          shift_id?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          area_id?: string | null
+          codigo?: string
+          created_at?: string
+          created_by?: string | null
+          function_id?: string | null
+          id?: string
+          motivo?: string | null
+          observacao?: string | null
+          previsao_preenchimento?: string | null
+          quantidade?: number
+          shift_id?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_openings_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_openings_function_id_fkey"
+            columns: ["function_id"]
+            isOneToOne: false
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_openings_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
         ]
@@ -554,23 +703,59 @@ export type Database = {
         Row: {
           ativo: boolean
           created_at: string
+          created_by: string | null
           id: string
           nome: string
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
           ativo?: boolean
           created_at?: string
+          created_by?: string | null
           id?: string
           nome: string
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
           ativo?: boolean
           created_at?: string
+          created_by?: string | null
           id?: string
           nome?: string
           updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      units: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          created_by: string | null
+          id: string
+          nome: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -578,19 +763,28 @@ export type Database = {
         Row: {
           area_id: string
           created_at: string
+          created_by: string | null
           id: string
+          updated_at: string
+          updated_by: string | null
           user_id: string
         }
         Insert: {
           area_id: string
           created_at?: string
+          created_by?: string | null
           id?: string
+          updated_at?: string
+          updated_by?: string | null
           user_id: string
         }
         Update: {
           area_id?: string
           created_at?: string
+          created_by?: string | null
           id?: string
+          updated_at?: string
+          updated_by?: string | null
           user_id?: string
         }
         Relationships: [
@@ -624,9 +818,102 @@ export type Database = {
         }
         Relationships: []
       }
+      vacation_approvals: {
+        Row: {
+          area_id_considerada: string | null
+          created_at: string
+          created_by: string | null
+          decidido_em: string | null
+          decidido_por: string | null
+          decisao: Database["public"]["Enums"]["approval_status"]
+          function_id_considerada: string | null
+          id: string
+          justificativa: string | null
+          severidade_maxima:
+            | Database["public"]["Enums"]["conflict_severity"]
+            | null
+          shift_id_considerado: string | null
+          solicitado_em: string
+          solicitado_por: string | null
+          updated_at: string
+          updated_by: string | null
+          vacation_id: string
+        }
+        Insert: {
+          area_id_considerada?: string | null
+          created_at?: string
+          created_by?: string | null
+          decidido_em?: string | null
+          decidido_por?: string | null
+          decisao?: Database["public"]["Enums"]["approval_status"]
+          function_id_considerada?: string | null
+          id?: string
+          justificativa?: string | null
+          severidade_maxima?:
+            | Database["public"]["Enums"]["conflict_severity"]
+            | null
+          shift_id_considerado?: string | null
+          solicitado_em?: string
+          solicitado_por?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vacation_id: string
+        }
+        Update: {
+          area_id_considerada?: string | null
+          created_at?: string
+          created_by?: string | null
+          decidido_em?: string | null
+          decidido_por?: string | null
+          decisao?: Database["public"]["Enums"]["approval_status"]
+          function_id_considerada?: string | null
+          id?: string
+          justificativa?: string | null
+          severidade_maxima?:
+            | Database["public"]["Enums"]["conflict_severity"]
+            | null
+          shift_id_considerado?: string | null
+          solicitado_em?: string
+          solicitado_por?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vacation_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacation_approvals_area_id_considerada_fkey"
+            columns: ["area_id_considerada"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacation_approvals_function_id_considerada_fkey"
+            columns: ["function_id_considerada"]
+            isOneToOne: false
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacation_approvals_shift_id_considerado_fkey"
+            columns: ["shift_id_considerado"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacation_approvals_vacation_id_fkey"
+            columns: ["vacation_id"]
+            isOneToOne: false
+            referencedRelation: "vacations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vacation_conflicts: {
         Row: {
           created_at: string
+          created_by: string | null
           detalhes: Json
           dias_coincidentes: number | null
           id: string
@@ -640,10 +927,13 @@ export type Database = {
           reconhecido_por: string | null
           regra: string
           severidade: Database["public"]["Enums"]["conflict_severity"]
+          updated_at: string
+          updated_by: string | null
           vacation_id: string
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           detalhes?: Json
           dias_coincidentes?: number | null
           id?: string
@@ -657,10 +947,13 @@ export type Database = {
           reconhecido_por?: string | null
           regra: string
           severidade: Database["public"]["Enums"]["conflict_severity"]
+          updated_at?: string
+          updated_by?: string | null
           vacation_id: string
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           detalhes?: Json
           dias_coincidentes?: number | null
           id?: string
@@ -674,6 +967,8 @@ export type Database = {
           reconhecido_por?: string | null
           regra?: string
           severidade?: Database["public"]["Enums"]["conflict_severity"]
+          updated_at?: string
+          updated_by?: string | null
           vacation_id?: string
         }
         Relationships: [
@@ -702,51 +997,79 @@ export type Database = {
       }
       vacations: {
         Row: {
+          aprovado_em: string | null
+          aprovado_por: string | null
+          area_id_aprovacao: string | null
           area_id_snapshot: string | null
           created_at: string
           created_by: string | null
           employee_id: string
           fim: string
+          function_id_aprovacao: string | null
+          function_id_snapshot: string | null
           id: string
           inicio: string
           observacao: string | null
+          shift_id_aprovacao: string | null
           shift_id_snapshot: string | null
           status: Database["public"]["Enums"]["vacation_status"]
           substituto_employee_id: string | null
           substituto_nome: string | null
           updated_at: string
+          updated_by: string | null
         }
         Insert: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          area_id_aprovacao?: string | null
           area_id_snapshot?: string | null
           created_at?: string
           created_by?: string | null
           employee_id: string
           fim: string
+          function_id_aprovacao?: string | null
+          function_id_snapshot?: string | null
           id?: string
           inicio: string
           observacao?: string | null
+          shift_id_aprovacao?: string | null
           shift_id_snapshot?: string | null
           status?: Database["public"]["Enums"]["vacation_status"]
           substituto_employee_id?: string | null
           substituto_nome?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Update: {
+          aprovado_em?: string | null
+          aprovado_por?: string | null
+          area_id_aprovacao?: string | null
           area_id_snapshot?: string | null
           created_at?: string
           created_by?: string | null
           employee_id?: string
           fim?: string
+          function_id_aprovacao?: string | null
+          function_id_snapshot?: string | null
           id?: string
           inicio?: string
           observacao?: string | null
+          shift_id_aprovacao?: string | null
           shift_id_snapshot?: string | null
           status?: Database["public"]["Enums"]["vacation_status"]
           substituto_employee_id?: string | null
           substituto_nome?: string | null
           updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "vacations_area_id_aprovacao_fkey"
+            columns: ["area_id_aprovacao"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "vacations_area_id_snapshot_fkey"
             columns: ["area_id_snapshot"]
@@ -759,6 +1082,27 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacations_function_id_aprovacao_fkey"
+            columns: ["function_id_aprovacao"]
+            isOneToOne: false
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacations_function_id_snapshot_fkey"
+            columns: ["function_id_snapshot"]
+            isOneToOne: false
+            referencedRelation: "functions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacations_shift_id_aprovacao_fkey"
+            columns: ["shift_id_aprovacao"]
+            isOneToOne: false
+            referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
           {

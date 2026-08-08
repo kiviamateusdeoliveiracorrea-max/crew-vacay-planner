@@ -92,7 +92,7 @@ function ImportarPage() {
   useEffect(() => {
     void (async () => {
       const { data } = await supabase
-        .from("import_mappings")
+        .from("import_templates")
         .select("id, nome, mapeamento")
         .order("created_at", { ascending: false });
       setModelos(
@@ -202,7 +202,7 @@ function ImportarPage() {
       return;
     }
     const { data, error } = await supabase
-      .from("import_mappings")
+      .from("import_templates")
       .insert({ nome: nomeModelo.trim(), mapeamento, created_by: user?.id ?? null })
       .select("id, nome, mapeamento")
       .single();
