@@ -133,6 +133,13 @@ export const promoverPrimeiroAdmin = createServerFn({ method: "POST" })
     return { ok: true, email };
   });
 
+export type SolicitacaoPendente = {
+  id: string;
+  areaId: string | null;
+  justificativa: string;
+  criadoEm: string;
+};
+
 export type UsuarioAcesso = {
   id: string;
   email: string | null;
@@ -140,10 +147,12 @@ export type UsuarioAcesso = {
   ativo: boolean;
   criadoEm: string | null;
   ultimoAcesso: string | null;
+  liberadoEm: string | null;
   papeis: Papel[];
   unidades: string[];
   areas: string[];
   concedidoPor: string | null;
+  solicitacao: SolicitacaoPendente | null;
 };
 
 export const listarUsuarios = createServerFn({ method: "GET" })
@@ -153,11 +162,16 @@ export const listarUsuarios = createServerFn({ method: "GET" })
     const { data: lista, error } = await db.auth.admin.listUsers({ page: 1, perPage: 1000 });
     if (error) throw error;
 
-    const [{ data: perfis }, { data: roles }, { data: perms }] = await Promise.all([
-      db.from("profiles").select("id, email, nome, ativo"),
-      db.from("user_roles").select("user_id, role"),
-      db.from("user_area_permissions").select("user_id, area_id, unit_id, concedido_por"),
-    ]);
+    const [{ data: perfis }, { data: roles }, { data: perms }, { data: solicitacoes }] =
+      await Promise.all([
+        db.from("profiles").select("id, email, nome, ativo"),
+        db.from("user_roles").select("user_id, role, created_at"),
+        db.from("user_area_permissions").select("user_id, area_id, unit_id, concedido_por"),
+        db
+          .from("access_requests")
+          .select("id, user_id, area_id, justificativa, created_at")
+          .eq("status", "PENDENTE"),
+      ]);
 
     const emailPorId = new Map((lista.users ?? []).map((u) => [u.id, u.email ?? null]));
     (perfis ?? []).forEach((p) => {
@@ -167,7 +181,13 @@ export const listarUsuarios = createServerFn({ method: "GET" })
     return (lista.users ?? []).map((u) => {
       const perfil = (perfis ?? []).find((p) => p.id === u.id);
       const meusPerms = (perms ?? []).filter((p) => p.user_id === u.id);
+      const meusRoles = (roles ?? []).filter((r) => r.user_id === u.id);
       const concedente = meusPerms.find((p) => p.concedido_por)?.concedido_por ?? null;
+      const sol = (solicitacoes ?? []).find((s) => s.user_id === u.id) ?? null;
+      const liberadoEm = meusRoles
+        .map((r) => r.created_at)
+        .filter(Boolean)
+        .sort()[0] as string | undefined;
       return {
         id: u.id,
         email: u.email ?? perfil?.email ?? null,
@@ -175,13 +195,23 @@ export const listarUsuarios = createServerFn({ method: "GET" })
         ativo: perfil?.ativo ?? true,
         criadoEm: u.created_at ?? null,
         ultimoAcesso: u.last_sign_in_at ?? null,
-        papeis: (roles ?? []).filter((r) => r.user_id === u.id).map((r) => r.role as Papel),
+        liberadoEm: liberadoEm ?? null,
+        papeis: meusRoles.map((r) => r.role as Papel),
         unidades: meusPerms.filter((p) => !p.area_id && p.unit_id).map((p) => p.unit_id!),
         areas: meusPerms.filter((p) => p.area_id).map((p) => p.area_id!),
         concedidoPor: concedente ? (emailPorId.get(concedente) ?? concedente) : null,
+        solicitacao: sol
+          ? {
+              id: sol.id,
+              areaId: sol.area_id,
+              justificativa: sol.justificativa,
+              criadoEm: sol.created_at,
+            }
+          : null,
       };
     });
   });
+
 
 const salvarSchema = z.object({
   userId: z.string().uuid(),
