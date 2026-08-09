@@ -296,7 +296,7 @@ function AdminPage() {
         </Card>
 
         <Input
-          placeholder="Pesquisar por e-mail…"
+          placeholder="Pesquisar por nome ou e-mail…"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           className="max-w-sm"
