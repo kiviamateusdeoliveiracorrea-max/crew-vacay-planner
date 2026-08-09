@@ -6,11 +6,13 @@ import {
   minhaSolicitacaoAcesso,
   listarUsuarios,
   promoverPrimeiroAdmin,
+  rejeitarSolicitacao,
   removerAcesso,
   salvarAcesso,
   solicitarAcesso,
 } from "@/lib/acessos.functions";
 import { useAuth } from "@/hooks/useAuth";
+
 
 export function useDiagnosticoAcesso() {
   const fn = useServerFn(diagnosticoAcesso);
