@@ -48,20 +48,27 @@ function AdminPage() {
   const usuarios = useUsuariosAcesso(ehAdmin);
   const salvar = useSalvarAcesso();
   const remover = useRemoverAcesso();
+  const rejeitar = useRejeitarSolicitacao();
 
   const [busca, setBusca] = useState("");
   const [rascunhos, setRascunhos] = useState<Record<string, Rascunho>>({});
 
   const areas = cat.data?.areas ?? [];
   const unidades = cat.data?.unidades ?? [];
+  const nomeArea = (id: string | null) => areas.find((a) => a.id === id)?.nome ?? null;
 
   const lista = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     const todos = usuarios.data ?? [];
     return termo
-      ? todos.filter((u) => (u.email ?? "").toLowerCase().includes(termo))
+      ? todos.filter(
+          (u) =>
+            (u.email ?? "").toLowerCase().includes(termo) ||
+            (u.nome ?? "").toLowerCase().includes(termo),
+        )
       : todos;
   }, [usuarios.data, busca]);
+
 
   const pendentes = lista.filter((u) => u.papeis.length === 0);
   const cadastrados = lista.filter((u) => u.papeis.length > 0);
