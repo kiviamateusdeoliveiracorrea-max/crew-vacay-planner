@@ -75,6 +75,19 @@ export function useRemoverAcesso() {
   });
 }
 
+export function useRejeitarSolicitacao() {
+  const fn = useServerFn(rejeitarSolicitacao);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { userId: string; resposta?: string }) => fn({ data } as never),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["usuarios-acesso"] });
+      qc.invalidateQueries({ queryKey: ["audit"] });
+    },
+  });
+}
+
+
 export function useAreasSolicitacao() {
   const fn = useServerFn(areasParaSolicitacao);
   const { user } = useAuth();
