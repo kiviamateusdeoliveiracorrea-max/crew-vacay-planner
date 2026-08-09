@@ -229,6 +229,25 @@ function AdminPage() {
                 Descartar
               </Button>
             )}
+            {u.solicitacao && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={rejeitar.isPending}
+                onClick={() =>
+                  rejeitar.mutate(
+                    { userId: u.id },
+                    {
+                      onSuccess: () => toast.success("Solicitação recusada."),
+                      onError: (e) => toast.error((e as Error).message),
+                    },
+                  )
+                }
+              >
+                Recusar solicitação
+              </Button>
+            )}
+
             <Button
               size="sm"
               variant="outline"
