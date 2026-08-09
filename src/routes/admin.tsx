@@ -9,8 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useCatalogos, usePerfil } from "@/hooks/useSistema";
-import { useRemoverAcesso, useSalvarAcesso, useUsuariosAcesso } from "@/hooks/useAcessos";
+import {
+  useRejeitarSolicitacao,
+  useRemoverAcesso,
+  useSalvarAcesso,
+  useUsuariosAcesso,
+} from "@/hooks/useAcessos";
 import { PAPEIS, PAPEL_DESCRICAO, fmtDataHora, type Papel } from "@/lib/sistema";
+
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -42,20 +48,27 @@ function AdminPage() {
   const usuarios = useUsuariosAcesso(ehAdmin);
   const salvar = useSalvarAcesso();
   const remover = useRemoverAcesso();
+  const rejeitar = useRejeitarSolicitacao();
 
   const [busca, setBusca] = useState("");
   const [rascunhos, setRascunhos] = useState<Record<string, Rascunho>>({});
 
   const areas = cat.data?.areas ?? [];
   const unidades = cat.data?.unidades ?? [];
+  const nomeArea = (id: string | null) => areas.find((a) => a.id === id)?.nome ?? null;
 
   const lista = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     const todos = usuarios.data ?? [];
     return termo
-      ? todos.filter((u) => (u.email ?? "").toLowerCase().includes(termo))
+      ? todos.filter(
+          (u) =>
+            (u.email ?? "").toLowerCase().includes(termo) ||
+            (u.nome ?? "").toLowerCase().includes(termo),
+        )
       : todos;
   }, [usuarios.data, busca]);
+
 
   const pendentes = lista.filter((u) => u.papeis.length === 0);
   const cadastrados = lista.filter((u) => u.papeis.length > 0);
@@ -117,9 +130,19 @@ function AdminPage() {
               <p className="text-xs text-muted-foreground">{u.email ?? "sem e-mail"}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Último acesso: {fmtDataHora(u.ultimoAcesso)} · Permissão concedida por:{" "}
-                {u.concedidoPor ?? "—"}
+                {u.concedidoPor ?? "—"} · Liberado em: {fmtDataHora(u.liberadoEm)}
               </p>
+              {u.solicitacao && (
+                <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-foreground">
+                  <p className="font-medium">
+                    Solicitação de acesso em {fmtDataHora(u.solicitacao.criadoEm)} · Área solicitada:{" "}
+                    {nomeArea(u.solicitacao.areaId) ?? "não informada"}
+                  </p>
+                  <p className="mt-1 text-muted-foreground">{u.solicitacao.justificativa}</p>
+                </div>
+              )}
             </div>
+
             <label className="flex items-center gap-2 text-xs">
               <Switch
                 checked={r.ativo}
@@ -206,6 +229,25 @@ function AdminPage() {
                 Descartar
               </Button>
             )}
+            {u.solicitacao && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={rejeitar.isPending}
+                onClick={() =>
+                  rejeitar.mutate(
+                    { userId: u.id },
+                    {
+                      onSuccess: () => toast.success("Solicitação recusada."),
+                      onError: (e) => toast.error((e as Error).message),
+                    },
+                  )
+                }
+              >
+                Recusar solicitação
+              </Button>
+            )}
+
             <Button
               size="sm"
               variant="outline"
@@ -254,7 +296,7 @@ function AdminPage() {
         </Card>
 
         <Input
-          placeholder="Pesquisar por e-mail…"
+          placeholder="Pesquisar por nome ou e-mail…"
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           className="max-w-sm"
