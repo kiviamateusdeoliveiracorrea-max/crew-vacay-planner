@@ -274,6 +274,19 @@ export const salvarAcesso = createServerFn({ method: "POST" })
       if (error) throw error;
     }
 
+    if (data.papeis.length && data.ativo) {
+      await db
+        .from("access_requests")
+        .update({
+          status: "APROVADO",
+          decidido_por: context.userId,
+          decidido_em: new Date().toISOString(),
+          resposta: "Acesso liberado pela tela Usuários e Acessos.",
+        })
+        .eq("user_id", data.userId)
+        .eq("status", "PENDENTE");
+    }
+
     await auditar(
       "UPDATE",
       data.userId,
@@ -289,6 +302,46 @@ export const salvarAcesso = createServerFn({ method: "POST" })
 
     return { ok: true };
   });
+
+/** Rejeita a solicitação de acesso pendente de um usuário (sem conceder acesso). */
+export const rejeitarSolicitacao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({ userId: z.string().uuid(), resposta: z.string().trim().max(500).optional() }).parse(d),
+  )
+  .handler(async ({ context, data }) => {
+    const db = await exigirAdmin(context.userId);
+    const { data: pendente } = await db
+      .from("access_requests")
+      .select("id, area_id, justificativa")
+      .eq("user_id", data.userId)
+      .eq("status", "PENDENTE")
+      .maybeSingle();
+    if (!pendente) throw new Error("Não há solicitação pendente para este usuário.");
+
+    const { error } = await db
+      .from("access_requests")
+      .update({
+        status: "REJEITADO",
+        decidido_por: context.userId,
+        decidido_em: new Date().toISOString(),
+        resposta: data.resposta ?? "Solicitação recusada pelo administrador.",
+      })
+      .eq("id", pendente.id);
+    if (error) throw error;
+
+    await auditar(
+      "REJEICAO_ACESSO",
+      data.userId,
+      context.userId,
+      { status: "PENDENTE", area_id: pendente.area_id, justificativa: pendente.justificativa },
+      { status: "REJEITADO", resposta: data.resposta ?? null },
+      "Solicitação de acesso recusada na tela Usuários e Acessos.",
+    );
+
+    return { ok: true };
+  });
+
 
 export const removerAcesso = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
