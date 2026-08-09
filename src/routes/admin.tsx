@@ -130,9 +130,19 @@ function AdminPage() {
               <p className="text-xs text-muted-foreground">{u.email ?? "sem e-mail"}</p>
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Último acesso: {fmtDataHora(u.ultimoAcesso)} · Permissão concedida por:{" "}
-                {u.concedidoPor ?? "—"}
+                {u.concedidoPor ?? "—"} · Liberado em: {fmtDataHora(u.liberadoEm)}
               </p>
+              {u.solicitacao && (
+                <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-[11px] text-foreground">
+                  <p className="font-medium">
+                    Solicitação de acesso em {fmtDataHora(u.solicitacao.criadoEm)} · Área solicitada:{" "}
+                    {nomeArea(u.solicitacao.areaId) ?? "não informada"}
+                  </p>
+                  <p className="mt-1 text-muted-foreground">{u.solicitacao.justificativa}</p>
+                </div>
+              )}
             </div>
+
             <label className="flex items-center gap-2 text-xs">
               <Switch
                 checked={r.ativo}
