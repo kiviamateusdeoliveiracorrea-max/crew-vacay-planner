@@ -9,8 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useCatalogos, usePerfil } from "@/hooks/useSistema";
-import { useRemoverAcesso, useSalvarAcesso, useUsuariosAcesso } from "@/hooks/useAcessos";
+import {
+  useRejeitarSolicitacao,
+  useRemoverAcesso,
+  useSalvarAcesso,
+  useUsuariosAcesso,
+} from "@/hooks/useAcessos";
 import { PAPEIS, PAPEL_DESCRICAO, fmtDataHora, type Papel } from "@/lib/sistema";
+
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
