@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import intralogLogoAsset from "@/assets/intralog-logo.png.asset.json";
 import { APP_NOME, APP_SUBTITULO } from "@/components/layout/Marca";
+import { mensagemAutenticacao } from "@/lib/mensagens";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -54,7 +55,7 @@ function AuthPage() {
         toast.success("Conta criada! Você já pode acessar.");
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Não foi possível entrar");
+      toast.error(mensagemAutenticacao(err));
     } finally {
       setBusy(false);
     }
@@ -65,7 +66,7 @@ function AuthPage() {
       redirect_uri: window.location.origin,
     });
     if (result.error) {
-      toast.error("Falha ao entrar com Google");
+      toast.error("Não foi possível entrar com o Google. Tente novamente.");
       return;
     }
     if (result.redirected) return;
@@ -81,7 +82,7 @@ function AuthPage() {
       redirectTo: window.location.origin,
     });
     if (error) {
-      toast.error("Não foi possível enviar o link de recuperação.");
+      toast.error("Não foi possível enviar o link de recuperação agora. Tente novamente em alguns instantes.");
       return;
     }
     toast.success("Se o e-mail estiver cadastrado, enviaremos um link de recuperação.");

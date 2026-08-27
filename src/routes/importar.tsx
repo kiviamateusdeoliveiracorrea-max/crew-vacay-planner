@@ -71,6 +71,7 @@ import { MODELOS, VERSAO_MODELO, baixarModelo } from "@/lib/modelo-importacao";
 import { humaniza, normaliza } from "@/lib/sistema";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import { useAvisoErro } from "@/hooks/useAvisoErro";
+import { rotularCodigo } from "@/lib/mensagens";
 
 export const Route = createFileRoute("/importar")({
   head: () => ({
@@ -820,7 +821,7 @@ function ImportarPage() {
                     <SelectContent>
                       {modelos.map((m) => (
                         <SelectItem key={m.id} value={m.id}>
-                          {m.nome} · {humaniza(m.fonte)}
+                          {m.nome} · {rotularCodigo(m.fonte)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -906,7 +907,7 @@ function ImportarPage() {
                     onClick={() => setFClasse(fClasse === k ? TODAS : k)}
                     className={`rounded px-2 py-1 text-xs ${CLASSE_COR[k as keyof typeof CLASSE_COR]} ${fClasse === k ? "ring-2 ring-ring" : ""}`}
                   >
-                    {humaniza(k)}: {v}
+                    {rotularCodigo(k)}: {v}
                   </button>
                 ))}
               </div>
@@ -939,7 +940,7 @@ function ImportarPage() {
                         <SelectItem value={TODAS}>Todos</SelectItem>
                         {f.itens.map((i) => (
                           <SelectItem key={i} value={i}>
-                            {humaniza(i)}
+                            {rotularCodigo(i)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -975,11 +976,11 @@ function ImportarPage() {
                             <span
                               className={`rounded px-1.5 py-0.5 ${CLASSE_COR[l.classificacao]}`}
                             >
-                              {humaniza(l.classificacao)}
+                              {rotularCodigo(l.classificacao)}
                             </span>
                           </td>
                           <td className="p-2 text-muted-foreground">
-                            {difs.map(([c]) => humaniza(c)).join(", ") || "—"}
+                            {difs.map(([c]) => rotularCodigo(c)).join(", ") || "—"}
                           </td>
                           <td className="p-2 text-muted-foreground">
                             {difs.map(([, d]) => d.de ?? "—").join(", ") || "—"}

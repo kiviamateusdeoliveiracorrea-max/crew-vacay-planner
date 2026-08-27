@@ -32,6 +32,7 @@ import {
 } from "@/hooks/useSistema";
 import { fmtData, humaniza, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
 import { useAvisoErro } from "@/hooks/useAvisoErro";
+import { rotularCodigo } from "@/lib/mensagens";
 
 const STATUS = ["PENDENTE", "APROVADA", "REJEITADA", "CANCELADA"] as const;
 const TODOS = "__todos__";
@@ -212,7 +213,7 @@ function MovimentacoesPage() {
               <SelectItem value={TODOS}>Todos os tipos</SelectItem>
               {TIPOS_MOVIMENTACAO.map((t) => (
                 <SelectItem key={t} value={t}>
-                  {humaniza(t)}
+                  {rotularCodigo(t)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -231,7 +232,7 @@ function MovimentacoesPage() {
               <SelectItem value={TODOS}>Todos os status</SelectItem>
               {STATUS.map((s) => (
                 <SelectItem key={s} value={s}>
-                  {humaniza(s)}
+                  {rotularCodigo(s)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -288,7 +289,7 @@ function MovimentacoesPage() {
                       )}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {humaniza(m.tipo)} · {nomeArea(m.area_origem_id)} → {nomeArea(m.area_destino_id)}
+                      {rotularCodigo(m.tipo)} · {nomeArea(m.area_origem_id)} → {nomeArea(m.area_destino_id)}
                       {" · "}
                       {nomeTurno(m.shift_origem_id)} → {nomeTurno(m.shift_destino_id)}
                     </p>
@@ -305,7 +306,7 @@ function MovimentacoesPage() {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline" className="text-[10px]">
-                      {humaniza(m.status)}
+                      {rotularCodigo(m.status)}
                     </Badge>
                     <Button size="sm" variant="ghost" onClick={() => setHistoricoDe(m)}>
                       Histórico
@@ -392,9 +393,9 @@ function MovimentacoesPage() {
             {historico.map((h) => (
               <li key={h.id} className="rounded-lg border border-border p-3 text-xs">
                 <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
-                  {fmtData(h.data_efetiva)} · {humaniza(h.tipo)}
+                  {fmtData(h.data_efetiva)} · {rotularCodigo(h.tipo)}
                   <Badge variant="outline" className="text-[10px]">
-                    {humaniza(h.status)}
+                    {rotularCodigo(h.status)}
                   </Badge>
                   {h.temporaria && (
                     <Badge className="bg-amber-500/15 text-[10px] text-amber-700 dark:text-amber-400">

@@ -21,6 +21,7 @@ import {
 import { severidadeMax } from "@/lib/conflitos";
 import {
 import { useAvisoErro } from "@/hooks/useAvisoErro";
+import { rotularCodigo } from "@/lib/mensagens";
   diasEntre,
   fmtData,
   humaniza,
@@ -187,7 +188,7 @@ function FeriasPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px]">
-                          {humaniza(v.status)}
+                          {rotularCodigo(v.status)}
                         </Badge>
                         {sev && (
                           <span

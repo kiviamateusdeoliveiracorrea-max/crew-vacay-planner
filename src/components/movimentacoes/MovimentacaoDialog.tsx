@@ -25,6 +25,7 @@ import type { Area, Employee, Movement, Turno } from "@/lib/sistema";
 import { fmtData, humaniza, sobrepoe, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
 import {
 import { useAvisoErro } from "@/hooks/useAvisoErro";
+import { rotularCodigo } from "@/lib/mensagens";
   ehDefinitivo,
   ehTemporario,
   lotacaoDefinitiva,
@@ -295,7 +296,7 @@ export function MovimentacaoDialog({
                 <SelectContent>
                   {TIPOS_MOVIMENTACAO.map((t) => (
                     <SelectItem key={t} value={t}>
-                      {humaniza(t)}
+                      {rotularCodigo(t)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -353,7 +354,7 @@ export function MovimentacaoDialog({
                 <SelectContent>
                   {(["PENDENTE", "APROVADA", "REJEITADA", "CANCELADA"] as const).map((s) => (
                     <SelectItem key={s} value={s}>
-                      {humaniza(s)}
+                      {rotularCodigo(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
