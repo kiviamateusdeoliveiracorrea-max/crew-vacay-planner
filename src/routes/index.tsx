@@ -48,7 +48,7 @@ import {
 } from "@/hooks/useSistema";
 import { useResumoDoDia, useLotesPendentes } from "@/hooks/usePainelInicio";
 import { ehCritico, severidadeMax } from "@/lib/conflitos";
-import { humaniza, mesDe, sobrepoe, SEVERIDADE_PESO, type Severidade } from "@/lib/sistema";
+import { fmtDataHora, humaniza, mesDe, sobrepoe, SEVERIDADE_PESO, type Severidade } from "@/lib/sistema";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -407,7 +407,7 @@ function Painel() {
     titulo: string;
     valor: number;
     ajuda: string;
-    tom?: string;
+    tom?: string | undefined;
     drill: NonNullable<Drilldown>;
   };
 
