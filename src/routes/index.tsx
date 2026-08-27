@@ -149,7 +149,17 @@ function Painel() {
     });
   }, [mov.data, areasVisiveis, areaId, shiftId, mes]);
 
-  const ativas = ferias.filter((v) => v.status !== "CANCELADA");
+  /* ------------------------------------------------- resumo do dia e ações */
+
+  const hoje = hojeISO();
+  const anoAtual = hoje.slice(0, 4);
+  const emSeteDias = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+
+  /** Ativas = futuras + em gozo (exclui canceladas, concluídas e datas inválidas). */
+  const ativas = ferias.filter((v) => feriasAtiva(v, hoje));
+  const futuras = ferias.filter((v) => situacaoFerias(v, hoje) === "PROGRAMADA");
+  const feriasHoje = ferias.filter((v) => emFeriasEm(v, hoje));
+  const concluidasAno = ferias.filter((v) => concluidaNoAno(v, anoAtual, hoje));
   const criticas = ativas.filter((v) => ehCritico(v.conflitos));
   const chaveImpactadas = ativas.filter(
     (v) => funcoes.find((f) => f.id === v.employee?.function_id)?.funcao_chave,
@@ -163,10 +173,6 @@ function Painel() {
     (m) => m.status !== "CANCELADA" && m.status !== "REJEITADA",
   );
 
-  /* ------------------------------------------------- resumo do dia e ações */
-
-  const hoje = new Date().toISOString().slice(0, 10);
-  const emSeteDias = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   const resumoDia = useResumoDoDia(hoje);
   const lotes = useLotesPendentes();
 
@@ -182,7 +188,7 @@ function Painel() {
     (d) => d.status !== "FECHADA" && d.status !== "CANCELADA",
   );
 
-  const feriasHoje = ativas.filter((v) => v.inicio <= hoje && hoje <= v.fim);
+
   const afastados = useMemo(() => {
     const idsArea = new Set(areasVisiveis.map((a) => a.id));
     return employees.filter(
