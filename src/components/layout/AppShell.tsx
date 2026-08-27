@@ -15,6 +15,8 @@ const LINKS = [
   { to: "/movimentacoes", label: "Movimentações" },
   { to: "/chamada", label: "Chamada Diária" },
   { to: "/importar", label: "Importar base", cadastro: true },
+  { to: "/relatorios", label: "Relatórios e Exportações" },
+
 
 
   { to: "/auditoria", label: "Auditoria", admin: true },
