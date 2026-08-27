@@ -223,6 +223,7 @@ export type LinhaImportada = {
   classificacao: ClassificacaoImport;
   diferencas: Record<string, { de: string | null; para: string | null }>;
   erros: string[];
+  avisos: string[];
   employee_id: string | null;
   aplicar: boolean;
   decisao: DecisaoLinha;
@@ -320,6 +321,16 @@ export function classificar(
       }
     }
 
+    const avisos: string[] = [];
+    const conhecido = (valor: string, mapa: Map<string, string>) =>
+      !valor || [...mapa.values()].includes(normaliza(valor));
+    if (!conhecido(dados["area"] ?? "", nomeArea))
+      avisos.push(`Setor "${dados["area"]}" não existe no cadastro — será criado ao aprovar.`);
+    if (!conhecido(dados["turno"] ?? "", nomeTurno))
+      avisos.push(`Turno "${dados["turno"]}" não existe no cadastro — será criado ao aprovar.`);
+    if (!conhecido(dados["funcao"] ?? "", nomeFuncao))
+      avisos.push(`Função "${dados["funcao"]}" não existe no cadastro — será criada ao aprovar.`);
+
     const duplicado = !!chave && (contagem.get(chave) ?? 0) > 1;
     const atual = chave ? porRe.get(chave) : undefined;
 
@@ -371,6 +382,7 @@ export function classificar(
       classificacao,
       diferencas,
       erros,
+      avisos,
       employee_id: atual?.id ?? null,
       // Nada é aplicado sem decisão explícita do usuário na tela de comparação.
       aplicar: false,
@@ -381,7 +393,36 @@ export function classificar(
   });
 }
 
-export const podeAprovar = (l: LinhaImportada) => !BLOQUEADAS.includes(l.classificacao);
+export const podeAprovar = (l: LinhaImportada) =>
+  !BLOQUEADAS.includes(l.classificacao) && !l.erros.length;
+
+/** Guarda final: só linhas aprovadas e válidas podem ser gravadas. */
+export const linhaProcessavel = (l: LinhaImportada) => l.decisao === "APROVADA" && podeAprovar(l);
+
+/** Valida a decisão de mudança de setor (empréstimo exige data inicial e final). */
+export function validarDecisaoSetor(
+  l: LinhaImportada,
+  d: DecisaoSetor | undefined,
+): string | null {
+  if (l.classificacao !== "MUDANCA_DE_SETOR") return null;
+  if (!d) return null;
+  if (d.tipo === "IGNORAR" || d.tipo === "CORRECAO_CADASTRAL") return null;
+  if (!d.inicio) return "Informe a data efetiva da movimentação.";
+  if (d.tipo !== "DEFINITIVA" && !d.fim)
+    return "Movimentação temporária exige data final.";
+  if (d.tipo !== "DEFINITIVA" && d.fim && d.fim <= d.inicio)
+    return "A data final deve ser posterior à data efetiva.";
+  return null;
+}
+
+export const TIPO_MOVIMENTACAO: Record<
+  Exclude<DecisaoSetorTipo, "IGNORAR" | "CORRECAO_CADASTRAL">,
+  "TRANSFERENCIA_DEFINITIVA" | "EMPRESTIMO_TEMPORARIO" | "COBERTURA_DE_FERIAS"
+> = {
+  DEFINITIVA: "TRANSFERENCIA_DEFINITIVA",
+  TEMPORARIA: "EMPRESTIMO_TEMPORARIO",
+  COBERTURA_FERIAS: "COBERTURA_DE_FERIAS",
+};
 
 export const CLASSE_COR: Record<ClassificacaoImport, string> = {
   NOVO_COLABORADOR: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
