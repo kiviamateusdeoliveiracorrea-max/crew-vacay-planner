@@ -24,7 +24,7 @@ import {
 import { toast } from "sonner";
 import { useSalvarMovimentacao, type MovementFull } from "@/hooks/useSistema";
 import type { Area, Employee, Movement, Turno } from "@/lib/sistema";
-import { fmtData, humaniza, sobrepoe, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
+import { fmtData, sobrepoe, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
 import {
   ehDefinitivo,
   ehTemporario,

@@ -32,7 +32,7 @@ import {
   useVacations,
   type MovementFull,
 } from "@/hooks/useSistema";
-import { fmtData, humaniza, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
+import { fmtData, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
 
 const STATUS = ["PENDENTE", "APROVADA", "REJEITADA", "CANCELADA"] as const;
 const TODOS = "__todos__";
