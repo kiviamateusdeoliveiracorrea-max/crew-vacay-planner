@@ -160,6 +160,84 @@ function Painel() {
     (m) => m.status !== "CANCELADA" && m.status !== "REJEITADA",
   );
 
+  /* ------------------------------------------------- resumo do dia e ações */
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const emSeteDias = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const resumoDia = useResumoDoDia(hoje);
+  const lotes = useLotesPendentes();
+
+  const registrosHoje = resumoDia.data?.registros ?? [];
+  const presentesHoje = registrosHoje.filter((r) => r.attendance_status === "PRESENTE");
+  const ausentesHoje = registrosHoje.filter((r) =>
+    ["FALTA", "FALTA_JUSTIFICADA", "ATESTADO"].includes(r.attendance_status),
+  );
+  const chamadasNaoFechadas = (resumoDia.data?.dias ?? []).filter(
+    (d) => d.status !== "FECHADA" && d.status !== "CANCELADA",
+  );
+  const chamadasPendentesHoje = (resumoDia.data?.diasDoDia ?? []).filter(
+    (d) => d.status !== "FECHADA" && d.status !== "CANCELADA",
+  );
+
+  const feriasHoje = ativas.filter((v) => v.inicio <= hoje && hoje <= v.fim);
+  const afastados = useMemo(() => {
+    const idsArea = new Set(areasVisiveis.map((a) => a.id));
+    return employees.filter(
+      (e) =>
+        e.status === "AFASTADO" &&
+        idsArea.has(e.area_id ?? "") &&
+        (areaId === TODOS || e.area_id === areaId) &&
+        (shiftId === TODOS || e.shift_id === shiftId),
+    );
+  }, [employees, areasVisiveis, areaId, shiftId]);
+
+  const temporariasVigentes = previstas.filter(
+    (m) => m.temporaria && m.data_efetiva <= hoje && (!m.data_fim || m.data_fim >= hoje),
+  );
+  const temporariasEncerrando = temporariasVigentes.filter(
+    (m) => !!m.data_fim && m.data_fim <= emSeteDias,
+  );
+  const chaveSemSubstituto = ativas.filter(
+    (v) =>
+      funcoes.find((f) => f.id === v.employee?.function_id)?.funcao_chave &&
+      !v.substituto_employee_id &&
+      !v.substituto_nome,
+  );
+
+  const tab = (nome: string, colunas: string[], linhas: (string | number)[][]): Tabela => ({
+    nome,
+    colunas,
+    linhas,
+  });
+
+  const tabRegistros = (nome: string, itens: typeof registrosHoje) =>
+    tab(
+      nome,
+      ["RE", "Colaborador", "Função", "Situação", "Motivo", "Observação"],
+      itens.map((r) => [
+        r.employee_re ?? "—",
+        r.employee_name_snapshot ?? "—",
+        r.function_snapshot ?? "—",
+        humaniza(r.attendance_status),
+        r.absence_reason_id ?? "—",
+        r.notes ?? "—",
+      ]),
+    );
+
+  const tabChamadas = (nome: string, itens: typeof chamadasNaoFechadas) =>
+    tab(
+      nome,
+      ["Data", "Área", "Turno", "Situação", "Observação"],
+      itens.map((d) => [
+        d.attendance_date,
+        nomeArea(d.area_id),
+        nomeTurno(d.shift_id),
+        humaniza(d.status),
+        d.notes ?? "—",
+      ]),
+    );
+
+
   const porMes = useMemo(() => {
     const mapa = new Map<string, VacationFull[]>();
     for (const v of ativas) {
