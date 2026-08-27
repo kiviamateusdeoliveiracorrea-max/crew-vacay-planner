@@ -593,6 +593,54 @@ function ChamadaPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Tratamento de divergência */}
+      <Dialog open={!!divergenciaDe} onOpenChange={(o) => !o && setDivergenciaDe(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tratar divergência</DialogTitle>
+            <DialogDescription>
+              {divergenciaDe
+                ? `${divergenciaDe.registro.employee_re} — ${divergenciaDe.registro.employee_name_snapshot}: alterar de ${
+                    STATUS_PRESENCA_LABEL[divergenciaDe.registro.attendance_status]
+                  } para ${STATUS_PRESENCA_LABEL[divergenciaDe.status]}. A chamada não cancela férias, não altera movimentações nem o vínculo do colaborador — corrija o registro de origem quando necessário.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Descreva o tratamento da divergência (mínimo 10 caracteres)"
+            value={tratativa}
+            onChange={(e) => setTratativa(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDivergenciaDe(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={tratativa.trim().length < 10 || atualizar.isPending}
+              onClick={async () => {
+                if (!divergenciaDe) return;
+                const { registro, status, motivo } = divergenciaDe;
+                await atualizar.mutateAsync({
+                  id: registro.id,
+                  dayId: registro.attendance_day_id,
+                  patch: {
+                    attendance_status: status,
+                    absence_reason_id: motivo ? motivoPorCodigo(motivo) : null,
+                    notes: `Divergência tratada: ${tratativa.trim()}`,
+                    source: "MANUAL",
+                  },
+                });
+                setDivergenciaDe(null);
+                setTratativa("");
+                toast.success("Divergência tratada e registrada na auditoria.");
+              }}
+            >
+              Confirmar tratamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Reabertura */}
       <Dialog open={dlgReabrir} onOpenChange={setDlgReabrir}>
         <DialogContent>
