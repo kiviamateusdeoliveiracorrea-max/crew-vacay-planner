@@ -52,8 +52,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <Link to="/" className="text-sm font-semibold tracking-tight text-foreground">
-            Gestão de Férias
+          <Link to="/" className="flex items-center gap-2 text-sm font-semibold tracking-tight text-foreground">
+            <img
+              src={intralogLogoAsset.url}
+              alt="Intralog"
+              className="h-7 w-auto object-contain"
+            />
           </Link>
           <nav className="flex flex-1 flex-wrap items-center gap-1">
             {links.map((l) => (
