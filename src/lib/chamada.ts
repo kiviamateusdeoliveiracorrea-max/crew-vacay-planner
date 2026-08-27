@@ -372,5 +372,11 @@ export function bloqueiosFechamento(
       `${divergencias.length} divergência(s) não tratada(s): informe horário de chegada/saída ou observação`,
     );
 
+  const pendentesDivergentes = registros.filter((r) => r.notes?.includes(MARCA_DIVERGENCIA));
+  if (pendentesDivergentes.length)
+    erros.push(
+      `${pendentesDivergentes.length} registro(s) com "${MARCA_DIVERGENCIA}": trate a divergência antes de fechar`,
+    );
+
   return erros;
 }
