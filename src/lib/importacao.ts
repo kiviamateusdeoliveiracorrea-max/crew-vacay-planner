@@ -215,7 +215,17 @@ export type DecisaoSetorTipo =
   | "CORRECAO_CADASTRAL"
   | "IGNORAR";
 
-export type DecisaoSetor = { tipo: DecisaoSetorTipo; inicio: string; fim: string };
+export type DecisaoSetor = {
+  tipo: DecisaoSetorTipo;
+  inicio: string;
+  fim: string;
+  /** Movimentação temporária: origem/destino e justificativa são obrigatórios. */
+  areaOrigem?: string | null;
+  areaDestino?: string | null;
+  turnoOrigem?: string | null;
+  turnoDestino?: string | null;
+  justificativa?: string;
+};
 
 export type LinhaImportada = {
   linha: number;
