@@ -153,9 +153,19 @@ function ChamadaPage() {
   const nomeMotivo = (id: string | null) =>
     motivos.data?.find((m) => m.id === id)?.name ?? "—";
 
+  const protegido = (r: ChamadaRegistro) =>
+    r.attendance_status === "AFASTADO" ||
+    r.attendance_status === "FERIAS" ||
+    !!r.notes?.includes(MARCA_DIVERGENCIA);
+
   async function aplicarAcao(r: ChamadaRegistro, status: StatusPresenca, motivoCode?: string) {
     if (fechada) {
       toast.error("Chamada fechada. Use a correção com justificativa.");
+      return;
+    }
+    if (protegido(r) && status !== r.attendance_status) {
+      setDivergenciaDe({ registro: r, status, motivo: motivoCode });
+      setTratativa("");
       return;
     }
     await atualizar.mutateAsync({
@@ -168,6 +178,7 @@ function ChamadaPage() {
       },
     });
   }
+
 
   return (
     <AppShell>
