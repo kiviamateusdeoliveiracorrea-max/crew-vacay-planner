@@ -16,6 +16,28 @@ import { Button } from "@/components/ui/button";
 import { DrilldownDialog, type Drilldown } from "@/components/painel/DrilldownDialog";
 import { RegistroDialog, type RegistroFoco } from "@/components/painel/RegistroDialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical, Download, FileSpreadsheet, List } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { exportarCsvComCabecalho, exportarXlsx } from "@/lib/exportar";
+import { registrarExportacao } from "@/lib/relatorios.functions";
+import type { Tabela } from "@/lib/relatorios";
+import {
+  ctxPainel,
+  filtrosDoPainel,
+  parametrosPainel,
+  tabelaAgregada,
+  tabelaAVencerPainel,
+  tabelaFeriasPainel,
+  tabelaMovPainel,
+} from "@/lib/painel-export";
+import {
+  usePerfil,
   useCatalogos,
   useEmployees,
   useMovements,
@@ -50,6 +72,8 @@ export const Route = createFileRoute("/")({
 const TODOS = "__todos__";
 
 function Painel() {
+  const perfil = usePerfil();
+  const { user } = useAuth();
   const cat = useCatalogos();
   const emp = useEmployees();
   const fer = useVacations();
@@ -64,6 +88,7 @@ function Painel() {
   const [criticidade, setCriticidade] = useState(TODOS);
   const [drill, setDrill] = useState<Drilldown>(null);
   const [foco, setFoco] = useState<RegistroFoco>(null);
+  const [exportando, setExportando] = useState(false);
 
   const areas = cat.data?.areas ?? [];
   const turnos = cat.data?.turnos ?? [];
