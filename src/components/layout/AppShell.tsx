@@ -14,6 +14,8 @@ const LINKS = [
   { to: "/ferias", label: "Férias" },
   { to: "/movimentacoes", label: "Movimentações" },
   { to: "/chamada", label: "Chamada Diária" },
+  { to: "/importar", label: "Importar base", cadastro: true },
+
 
   { to: "/auditoria", label: "Auditoria", admin: true },
   { to: "/admin", label: "Usuários e Acessos", admin: true },
