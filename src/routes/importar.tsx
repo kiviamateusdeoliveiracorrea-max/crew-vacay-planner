@@ -923,78 +923,117 @@ function ImportarPage() {
                           <td className="p-2">{difs.map(([, d]) => d.para).join(", ") || "—"}</td>
                           <td className="p-2 text-muted-foreground">
                             {ACAO_SUGERIDA[l.classificacao]}
-                            {l.classificacao === "MUDANCA_DE_SETOR" && (
-                              <div className="mt-1 flex flex-wrap items-center gap-1">
-                                <Select
-                                  value={decisoes[l.linha]?.tipo ?? "DEFINITIVA"}
-                                  onValueChange={(v) =>
-                                    setDecisoes((prev) => ({
-                                      ...prev,
-                                      [l.linha]: {
-                                        tipo: v as DecisaoSetorTipo,
-                                        inicio: prev[l.linha]?.inicio ?? hoje(),
-                                        fim: prev[l.linha]?.fim ?? "",
-                                      },
-                                    }))
-                                  }
-                                >
-                                  <SelectTrigger className="h-7 w-[150px] text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="DEFINITIVA">
-                                      Transferência definitiva
-                                    </SelectItem>
-                                    <SelectItem value="TEMPORARIA">Empréstimo temporário</SelectItem>
-                                    <SelectItem value="COBERTURA_FERIAS">
-                                      Cobertura de férias
-                                    </SelectItem>
-                                    <SelectItem value="CORRECAO_CADASTRAL">
-                                      Correção cadastral
-                                    </SelectItem>
-                                    <SelectItem value="IGNORAR">Ignorar alteração</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                {decisoes[l.linha]?.tipo !== "IGNORAR" &&
-                                  decisoes[l.linha]?.tipo !== "CORRECAO_CADASTRAL" && (
+                            {l.classificacao === "MUDANCA_DE_SETOR" && (() => {
+                              const dec = decisoes[l.linha];
+                              const tipo = dec?.tipo ?? "DEFINITIVA";
+                              const temporaria =
+                                tipo === "TEMPORARIA" || tipo === "COBERTURA_FERIAS";
+                              const comData = tipo !== "IGNORAR" && tipo !== "CORRECAO_CADASTRAL";
+                              const erroDec = validarDecisaoSetor(l, dec);
+                              return (
+                                <div className="mt-1 flex flex-wrap items-center gap-1">
+                                  <Select
+                                    value={tipo}
+                                    onValueChange={(v) =>
+                                      ajustarDecisao(l.linha, { tipo: v as DecisaoSetorTipo })
+                                    }
+                                  >
+                                    <SelectTrigger className="h-7 w-[150px] text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="DEFINITIVA">
+                                        Transferência definitiva
+                                      </SelectItem>
+                                      <SelectItem value="TEMPORARIA">
+                                        Empréstimo temporário
+                                      </SelectItem>
+                                      <SelectItem value="COBERTURA_FERIAS">
+                                        Cobertura de férias
+                                      </SelectItem>
+                                      <SelectItem value="CORRECAO_CADASTRAL">
+                                        Correção cadastral
+                                      </SelectItem>
+                                      <SelectItem value="IGNORAR">Ignorar alteração</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {comData && (
                                     <Input
                                       type="date"
                                       title="Data efetiva"
                                       className="h-7 w-[135px] text-xs"
-                                      value={decisoes[l.linha]?.inicio ?? ""}
+                                      value={dec?.inicio ?? ""}
                                       onChange={(e) =>
-                                        setDecisoes((prev) => ({
-                                          ...prev,
-                                          [l.linha]: {
-                                            tipo: prev[l.linha]?.tipo ?? "DEFINITIVA",
-                                            inicio: e.target.value,
-                                            fim: prev[l.linha]?.fim ?? "",
-                                          },
-                                        }))
+                                        ajustarDecisao(l.linha, { inicio: e.target.value })
                                       }
                                     />
                                   )}
-                                {(decisoes[l.linha]?.tipo === "TEMPORARIA" ||
-                                  decisoes[l.linha]?.tipo === "COBERTURA_FERIAS") && (
-                                  <Input
-                                    type="date"
-                                    title="Data final"
-                                    className="h-7 w-[135px] text-xs"
-                                    value={decisoes[l.linha]?.fim ?? ""}
-                                    onChange={(e) =>
-                                      setDecisoes((prev) => ({
-                                        ...prev,
-                                        [l.linha]: {
-                                          tipo: prev[l.linha]?.tipo ?? "TEMPORARIA",
-                                          inicio: prev[l.linha]?.inicio ?? hoje(),
-                                          fim: e.target.value,
-                                        },
-                                      }))
-                                    }
-                                  />
-                                )}
-                              </div>
-                            )}
+                                  {temporaria && (
+                                    <>
+                                      <Input
+                                        type="date"
+                                        title="Data final"
+                                        className="h-7 w-[135px] text-xs"
+                                        value={dec?.fim ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { fim: e.target.value })
+                                        }
+                                      />
+                                      <Input
+                                        title="Área de origem"
+                                        placeholder="Área de origem"
+                                        className="h-7 w-[150px] text-xs"
+                                        value={dec?.areaOrigem ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { areaOrigem: e.target.value })
+                                        }
+                                      />
+                                      <Input
+                                        title="Área de destino"
+                                        placeholder="Área de destino"
+                                        className="h-7 w-[150px] text-xs"
+                                        value={dec?.areaDestino ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { areaDestino: e.target.value })
+                                        }
+                                      />
+                                      <Input
+                                        title="Turno de origem"
+                                        placeholder="Turno de origem"
+                                        className="h-7 w-[130px] text-xs"
+                                        value={dec?.turnoOrigem ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { turnoOrigem: e.target.value })
+                                        }
+                                      />
+                                      <Input
+                                        title="Turno de destino"
+                                        placeholder="Turno de destino"
+                                        className="h-7 w-[130px] text-xs"
+                                        value={dec?.turnoDestino ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { turnoDestino: e.target.value })
+                                        }
+                                      />
+                                      <Input
+                                        title="Justificativa da movimentação temporária"
+                                        placeholder="Justificativa"
+                                        className="h-7 w-[180px] text-xs"
+                                        value={dec?.justificativa ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { justificativa: e.target.value })
+                                        }
+                                      />
+                                    </>
+                                  )}
+                                  {erroDec && (
+                                    <span className="w-full text-[11px] text-destructive">
+                                      {erroDec}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="p-2">
                             <div className="flex flex-wrap gap-1">
