@@ -106,17 +106,63 @@ describe("Cenários 1 a 18 — módulo de importação (somente dados TESTE -)",
     expect(TIPO_MOVIMENTACAO[d.tipo as "DEFINITIVA"]).toBe("TRANSFERENCIA_DEFINITIVA");
   });
 
-  it("4. Empréstimo temporário exige data inicial e final", () => {
+  it("4. Empréstimo temporário exige datas, origem/destino e justificativa", () => {
     const l = uma({ SETOR: "TESTE - RECEBIMENTO" });
-    expect(validarDecisaoSetor(l, { tipo: "TEMPORARIA", inicio: "", fim: "" })).toMatch(/data efetiva/i);
-    expect(validarDecisaoSetor(l, { tipo: "TEMPORARIA", inicio: "2026-09-01", fim: "" })).toMatch(
-      /data final/i,
+    const completa = {
+      areaOrigem: "TESTE - ALMOXARIFADO",
+      areaDestino: "TESTE - RECEBIMENTO",
+      turnoOrigem: "TESTE - TURNO A",
+      turnoDestino: "TESTE - TURNO A",
+      justificativa: "Cobertura de demanda",
+    };
+    expect(validarDecisaoSetor(l, { tipo: "TEMPORARIA", inicio: "", fim: "", ...completa })).toMatch(
+      /data efetiva/i,
     );
     expect(
-      validarDecisaoSetor(l, { tipo: "TEMPORARIA", inicio: "2026-09-10", fim: "2026-09-01" }),
+      validarDecisaoSetor(l, { tipo: "TEMPORARIA", inicio: "2026-09-01", fim: "", ...completa }),
+    ).toMatch(/data final/i);
+    expect(
+      validarDecisaoSetor(l, {
+        tipo: "TEMPORARIA",
+        inicio: "2026-09-10",
+        fim: "2026-09-01",
+        ...completa,
+      }),
     ).toMatch(/posterior/i);
     expect(
-      validarDecisaoSetor(l, { tipo: "TEMPORARIA", inicio: "2026-09-01", fim: "2026-09-30" }),
+      validarDecisaoSetor(l, {
+        tipo: "TEMPORARIA",
+        inicio: "2026-09-01",
+        fim: "2026-09-30",
+        ...completa,
+        areaOrigem: "",
+      }),
+    ).toMatch(/área de origem/i);
+    expect(
+      validarDecisaoSetor(l, {
+        tipo: "TEMPORARIA",
+        inicio: "2026-09-01",
+        fim: "2026-09-30",
+        ...completa,
+        turnoDestino: "",
+      }),
+    ).toMatch(/turno de destino/i);
+    expect(
+      validarDecisaoSetor(l, {
+        tipo: "TEMPORARIA",
+        inicio: "2026-09-01",
+        fim: "2026-09-30",
+        ...completa,
+        justificativa: "",
+      }),
+    ).toMatch(/justificativa/i);
+    expect(
+      validarDecisaoSetor(l, {
+        tipo: "TEMPORARIA",
+        inicio: "2026-09-01",
+        fim: "2026-09-30",
+        ...completa,
+      }),
     ).toBeNull();
     expect(TIPO_MOVIMENTACAO["TEMPORARIA"]).toBe("EMPRESTIMO_TEMPORARIO");
     expect(TIPO_MOVIMENTACAO["COBERTURA_FERIAS"]).toBe("COBERTURA_DE_FERIAS");

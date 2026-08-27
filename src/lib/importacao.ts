@@ -215,7 +215,17 @@ export type DecisaoSetorTipo =
   | "CORRECAO_CADASTRAL"
   | "IGNORAR";
 
-export type DecisaoSetor = { tipo: DecisaoSetorTipo; inicio: string; fim: string };
+export type DecisaoSetor = {
+  tipo: DecisaoSetorTipo;
+  inicio: string;
+  fim: string;
+  /** Movimentação temporária: origem/destino e justificativa são obrigatórios. */
+  areaOrigem?: string | null;
+  areaDestino?: string | null;
+  turnoOrigem?: string | null;
+  turnoDestino?: string | null;
+  justificativa?: string;
+};
 
 export type LinhaImportada = {
   linha: number;
@@ -408,10 +418,16 @@ export function validarDecisaoSetor(
   if (!d) return null;
   if (d.tipo === "IGNORAR" || d.tipo === "CORRECAO_CADASTRAL") return null;
   if (!d.inicio) return "Informe a data efetiva da movimentação.";
-  if (d.tipo !== "DEFINITIVA" && !d.fim)
-    return "Movimentação temporária exige data final.";
-  if (d.tipo !== "DEFINITIVA" && d.fim && d.fim <= d.inicio)
-    return "A data final deve ser posterior à data efetiva.";
+  if (d.tipo !== "DEFINITIVA") {
+    if (!d.fim) return "Movimentação temporária exige data final.";
+    if (d.fim <= d.inicio) return "A data final deve ser posterior à data efetiva.";
+    if (!d.areaOrigem) return "Movimentação temporária exige a área de origem.";
+    if (!d.areaDestino) return "Movimentação temporária exige a área de destino.";
+    if (!d.turnoOrigem) return "Movimentação temporária exige o turno de origem.";
+    if (!d.turnoDestino) return "Movimentação temporária exige o turno de destino.";
+    if (!(d.justificativa ?? "").trim())
+      return "Movimentação temporária exige justificativa.";
+  }
   return null;
 }
 

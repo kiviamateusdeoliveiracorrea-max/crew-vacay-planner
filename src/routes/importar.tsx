@@ -200,11 +200,26 @@ function ImportarPage() {
     );
     setAnalisado(resultadoAnalise);
     setResultado(null);
+    const areaNome = new Map(cat.data!.areas.map((a) => [a.id, a.nome]));
+    const turnoNome = new Map(cat.data!.turnos.map((t) => [t.id, t.nome]));
     setDecisoes(
       Object.fromEntries(
         resultadoAnalise
           .filter((l) => l.classificacao === "MUDANCA_DE_SETOR")
-          .map((l) => [l.linha, { tipo: "DEFINITIVA", inicio: hoje(), fim: "" } as DecisaoSetor]),
+          .map((l) => {
+            const atual = emp.data!.find((e) => e.id === l.employee_id);
+            const dec: DecisaoSetor = {
+              tipo: "DEFINITIVA",
+              inicio: hoje(),
+              fim: "",
+              areaOrigem: areaNome.get(atual?.area_id ?? "") ?? null,
+              areaDestino: l.dados["area"] || null,
+              turnoOrigem: turnoNome.get(atual?.shift_id ?? "") ?? null,
+              turnoDestino: l.dados["turno"] || turnoNome.get(atual?.shift_id ?? "") || null,
+              justificativa: "",
+            };
+            return [l.linha, dec];
+          }),
       ),
     );
     toast.success(
@@ -246,6 +261,20 @@ function ImportarPage() {
         l.linha === linha ? { ...l, decisao, aplicar: decisao === "APROVADA" } : l,
       ),
     );
+  }
+
+  /** Atualiza parte da decisão de setor sem perder os demais campos. */
+  function ajustarDecisao(linha: number, patch: Partial<DecisaoSetor>) {
+    setDecisoes((prev) => ({
+      ...prev,
+      [linha]: {
+        tipo: "DEFINITIVA",
+        inicio: hoje(),
+        fim: "",
+        ...(prev[linha] ?? {}),
+        ...patch,
+      },
+    }));
   }
 
   function aprovarValidas() {
@@ -501,13 +530,31 @@ function ImportarPage() {
             continue;
           }
           const temporaria = decisao.tipo !== "DEFINITIVA";
+          // Nas temporárias vale exatamente o que o usuário confirmou na comparação.
+          const origemArea = temporaria
+            ? ((await garantir("areas", areas, decisao.areaOrigem ?? "")) ?? atual?.area_id ?? null)
+            : (atual?.area_id ?? null);
+          const destinoArea = temporaria
+            ? ((await garantir("areas", areas, decisao.areaDestino ?? "")) ?? areaId)
+            : areaId;
+          const origemTurno = temporaria
+            ? ((await garantir("shifts", turnos, decisao.turnoOrigem ?? "")) ??
+              atual?.shift_id ??
+              null)
+            : (atual?.shift_id ?? null);
+          const destinoTurno = temporaria
+            ? ((await garantir("shifts", turnos, decisao.turnoDestino ?? "")) ??
+              turnoId ??
+              atual?.shift_id ??
+              null)
+            : (turnoId ?? atual?.shift_id ?? null);
           const { error } = await supabase.from("employee_movements").insert({
             employee_id: l.employee_id,
             re: d["re"]!,
-            area_origem_id: atual?.area_id ?? null,
-            area_destino_id: areaId,
-            shift_origem_id: atual?.shift_id ?? null,
-            shift_destino_id: turnoId ?? atual?.shift_id ?? null,
+            area_origem_id: origemArea,
+            area_destino_id: destinoArea,
+            shift_origem_id: origemTurno,
+            shift_destino_id: destinoTurno,
             data_efetiva: decisao.inicio || hoje(),
             tipo:
               decisao.tipo === "DEFINITIVA"
@@ -517,7 +564,10 @@ function ImportarPage() {
                   : "EMPRESTIMO_TEMPORARIO",
             temporaria,
             data_fim: temporaria ? decisao.fim : null,
-            motivo: l.justificativa || `Importação ${arquivo?.nome ?? ""}`,
+            motivo:
+              (temporaria ? decisao.justificativa : "") ||
+              l.justificativa ||
+              `Importação ${arquivo?.nome ?? ""}`,
             status: "PENDENTE",
             created_by: user?.id ?? null,
           });
@@ -894,78 +944,117 @@ function ImportarPage() {
                           <td className="p-2">{difs.map(([, d]) => d.para).join(", ") || "—"}</td>
                           <td className="p-2 text-muted-foreground">
                             {ACAO_SUGERIDA[l.classificacao]}
-                            {l.classificacao === "MUDANCA_DE_SETOR" && (
-                              <div className="mt-1 flex flex-wrap items-center gap-1">
-                                <Select
-                                  value={decisoes[l.linha]?.tipo ?? "DEFINITIVA"}
-                                  onValueChange={(v) =>
-                                    setDecisoes((prev) => ({
-                                      ...prev,
-                                      [l.linha]: {
-                                        tipo: v as DecisaoSetorTipo,
-                                        inicio: prev[l.linha]?.inicio ?? hoje(),
-                                        fim: prev[l.linha]?.fim ?? "",
-                                      },
-                                    }))
-                                  }
-                                >
-                                  <SelectTrigger className="h-7 w-[150px] text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="DEFINITIVA">
-                                      Transferência definitiva
-                                    </SelectItem>
-                                    <SelectItem value="TEMPORARIA">Empréstimo temporário</SelectItem>
-                                    <SelectItem value="COBERTURA_FERIAS">
-                                      Cobertura de férias
-                                    </SelectItem>
-                                    <SelectItem value="CORRECAO_CADASTRAL">
-                                      Correção cadastral
-                                    </SelectItem>
-                                    <SelectItem value="IGNORAR">Ignorar alteração</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                {decisoes[l.linha]?.tipo !== "IGNORAR" &&
-                                  decisoes[l.linha]?.tipo !== "CORRECAO_CADASTRAL" && (
+                            {l.classificacao === "MUDANCA_DE_SETOR" && (() => {
+                              const dec = decisoes[l.linha];
+                              const tipo = dec?.tipo ?? "DEFINITIVA";
+                              const temporaria =
+                                tipo === "TEMPORARIA" || tipo === "COBERTURA_FERIAS";
+                              const comData = tipo !== "IGNORAR" && tipo !== "CORRECAO_CADASTRAL";
+                              const erroDec = validarDecisaoSetor(l, dec);
+                              return (
+                                <div className="mt-1 flex flex-wrap items-center gap-1">
+                                  <Select
+                                    value={tipo}
+                                    onValueChange={(v) =>
+                                      ajustarDecisao(l.linha, { tipo: v as DecisaoSetorTipo })
+                                    }
+                                  >
+                                    <SelectTrigger className="h-7 w-[150px] text-xs">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="DEFINITIVA">
+                                        Transferência definitiva
+                                      </SelectItem>
+                                      <SelectItem value="TEMPORARIA">
+                                        Empréstimo temporário
+                                      </SelectItem>
+                                      <SelectItem value="COBERTURA_FERIAS">
+                                        Cobertura de férias
+                                      </SelectItem>
+                                      <SelectItem value="CORRECAO_CADASTRAL">
+                                        Correção cadastral
+                                      </SelectItem>
+                                      <SelectItem value="IGNORAR">Ignorar alteração</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {comData && (
                                     <Input
                                       type="date"
                                       title="Data efetiva"
                                       className="h-7 w-[135px] text-xs"
-                                      value={decisoes[l.linha]?.inicio ?? ""}
+                                      value={dec?.inicio ?? ""}
                                       onChange={(e) =>
-                                        setDecisoes((prev) => ({
-                                          ...prev,
-                                          [l.linha]: {
-                                            tipo: prev[l.linha]?.tipo ?? "DEFINITIVA",
-                                            inicio: e.target.value,
-                                            fim: prev[l.linha]?.fim ?? "",
-                                          },
-                                        }))
+                                        ajustarDecisao(l.linha, { inicio: e.target.value })
                                       }
                                     />
                                   )}
-                                {(decisoes[l.linha]?.tipo === "TEMPORARIA" ||
-                                  decisoes[l.linha]?.tipo === "COBERTURA_FERIAS") && (
-                                  <Input
-                                    type="date"
-                                    title="Data final"
-                                    className="h-7 w-[135px] text-xs"
-                                    value={decisoes[l.linha]?.fim ?? ""}
-                                    onChange={(e) =>
-                                      setDecisoes((prev) => ({
-                                        ...prev,
-                                        [l.linha]: {
-                                          tipo: prev[l.linha]?.tipo ?? "TEMPORARIA",
-                                          inicio: prev[l.linha]?.inicio ?? hoje(),
-                                          fim: e.target.value,
-                                        },
-                                      }))
-                                    }
-                                  />
-                                )}
-                              </div>
-                            )}
+                                  {temporaria && (
+                                    <>
+                                      <Input
+                                        type="date"
+                                        title="Data final"
+                                        className="h-7 w-[135px] text-xs"
+                                        value={dec?.fim ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { fim: e.target.value })
+                                        }
+                                      />
+                                      <Input
+                                        title="Área de origem"
+                                        placeholder="Área de origem"
+                                        className="h-7 w-[150px] text-xs"
+                                        value={dec?.areaOrigem ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { areaOrigem: e.target.value })
+                                        }
+                                      />
+                                      <Input
+                                        title="Área de destino"
+                                        placeholder="Área de destino"
+                                        className="h-7 w-[150px] text-xs"
+                                        value={dec?.areaDestino ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { areaDestino: e.target.value })
+                                        }
+                                      />
+                                      <Input
+                                        title="Turno de origem"
+                                        placeholder="Turno de origem"
+                                        className="h-7 w-[130px] text-xs"
+                                        value={dec?.turnoOrigem ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { turnoOrigem: e.target.value })
+                                        }
+                                      />
+                                      <Input
+                                        title="Turno de destino"
+                                        placeholder="Turno de destino"
+                                        className="h-7 w-[130px] text-xs"
+                                        value={dec?.turnoDestino ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { turnoDestino: e.target.value })
+                                        }
+                                      />
+                                      <Input
+                                        title="Justificativa da movimentação temporária"
+                                        placeholder="Justificativa"
+                                        className="h-7 w-[180px] text-xs"
+                                        value={dec?.justificativa ?? ""}
+                                        onChange={(e) =>
+                                          ajustarDecisao(l.linha, { justificativa: e.target.value })
+                                        }
+                                      />
+                                    </>
+                                  )}
+                                  {erroDec && (
+                                    <span className="w-full text-[11px] text-destructive">
+                                      {erroDec}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="p-2">
                             <div className="flex flex-wrap gap-1">
@@ -1050,7 +1139,9 @@ function ImportarPage() {
                   onClick={() => setConfirmando(true)}
                   disabled={aplicando || aprovadas.length === 0 || decisaoInvalida}
                 >
-                  {aplicando ? "Processando…" : `Processar aprovadas (${aprovadas.length})`}
+                  {aplicando
+                    ? "Processando…"
+                    : `Processar alterações aprovadas (${aprovadas.length})`}
                 </Button>
                 <Button variant="ghost" onClick={cancelarLote} disabled={aplicando}>
                   Cancelar lote
@@ -1060,7 +1151,8 @@ function ImportarPage() {
                 </Badge>
                 {decisaoInvalida && (
                   <span className="text-xs text-destructive">
-                    Informe data efetiva (e data final nas temporárias) das mudanças de setor.
+                    Complete as mudanças de setor: data efetiva e, nas temporárias, data final,
+                    áreas e turnos de origem/destino e justificativa.
                   </span>
                 )}
               </div>
