@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +18,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -31,11 +39,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { useCatalogos, useEmployees, usePerfil } from "@/hooks/useSistema";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  CAMPOS,
+  ACAO_SUGERIDA,
+  CAMPOS_DEF,
   CLASSE_COR,
+  FONTES,
+  autoMapear,
+  camposDaFonte,
   classificar,
+  detectarCamposSensiveis,
+  podeAprovar,
   toISO,
   type CampoKey,
+  type ColunaIgnorada,
+  type DecisaoSetor,
+  type DecisaoSetorTipo,
+  type FonteKey,
   type LinhaImportada,
   type Mapeamento,
 } from "@/lib/importacao";
@@ -49,12 +67,13 @@ export const Route = createFileRoute("/importar")({
       {
         name: "description",
         content:
-          "Importe planilhas xlsx, xlsm ou csv com mapeamento de colunas, validação, comparação com a base atual e aprovação antes de aplicar.",
+          "Importe extrações do SAP/RH, Controle de Headcount ou férias a vencer com mapeamento, validação, comparação linha a linha e aprovação antes de aplicar.",
       },
       { property: "og:title", content: "Importar Base de Colaboradores" },
       {
         property: "og:description",
-        content: "Importação com mapeamento, prévia, validação e aprovação das alterações.",
+        content:
+          "Comparação da base recebida com a base atual, decisão por linha e aplicação somente após confirmação.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -64,9 +83,12 @@ export const Route = createFileRoute("/importar")({
 });
 
 const NENHUM = "__nenhum__";
+const TODAS = "__todas__";
 const hoje = () => new Date().toISOString().slice(0, 10);
+const tamanho = (b: number) =>
+  b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`;
 
-type DecisaoSetor = { tipo: "DEFINITIVA" | "TEMPORARIA"; fim: string };
+type Resultado = Record<string, number> & { rejeitados: number; movimentacoes: number };
 
 function ImportarPage() {
   const cat = useCatalogos();
@@ -75,30 +97,45 @@ function ImportarPage() {
   const { user } = useAuth();
   const qc = useQueryClient();
 
-  const [arquivo, setArquivo] = useState<string>("");
+  const [fonte, setFonte] = useState<FonteKey>("SAP_ATIVOS");
+  const [arquivo, setArquivo] = useState<{ nome: string; bytes: number; em: string } | null>(null);
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
   const [aba, setAba] = useState("");
   const [colunas, setColunas] = useState<string[]>([]);
+  const [ignoradas, setIgnoradas] = useState<ColunaIgnorada[]>([]);
   const [linhas, setLinhas] = useState<Record<string, string>[]>([]);
   const [mapeamento, setMapeamento] = useState<Mapeamento>({});
   const [nomeModelo, setNomeModelo] = useState("");
-  const [modelos, setModelos] = useState<{ id: string; nome: string; mapeamento: Mapeamento }[]>([]);
+  const [modelos, setModelos] = useState<
+    { id: string; nome: string; fonte: string; mapeamento: Mapeamento }[]
+  >([]);
   const [analisado, setAnalisado] = useState<LinhaImportada[] | null>(null);
   const [decisoes, setDecisoes] = useState<Record<number, DecisaoSetor>>({});
-  const [filtro, setFiltro] = useState<string>("TODAS");
+  const [corrigindo, setCorrigindo] = useState<LinhaImportada | null>(null);
+  const [rascunho, setRascunho] = useState<Record<string, string>>({});
+  const [fClasse, setFClasse] = useState(TODAS);
+  const [fArea, setFArea] = useState(TODAS);
+  const [fTurno, setFTurno] = useState(TODAS);
+  const [fStatus, setFStatus] = useState(TODAS);
+  const [fValida, setFValida] = useState(TODAS);
+  const [fDecisao, setFDecisao] = useState(TODAS);
   const [confirmando, setConfirmando] = useState(false);
   const [aplicando, setAplicando] = useState(false);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+
+  const campos = useMemo(() => camposDaFonte(fonte), [fonte]);
 
   useEffect(() => {
     void (async () => {
       const { data } = await supabase
         .from("import_templates")
-        .select("id, nome, mapeamento")
+        .select("id, nome, fonte, mapeamento")
         .order("created_at", { ascending: false });
       setModelos(
         (data ?? []).map((m) => ({
           id: m.id,
           nome: m.nome,
+          fonte: m.fonte ?? "PERSONALIZADO",
           mapeamento: (m.mapeamento ?? {}) as Mapeamento,
         })),
       );
@@ -108,72 +145,69 @@ function ImportarPage() {
   function limparAnalise() {
     setAnalisado(null);
     setDecisoes({});
+    setResultado(null);
   }
 
   async function carregarArquivo(file: File) {
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { cellDates: false });
     setWorkbook(wb);
-    setArquivo(file.name);
+    setArquivo({ nome: file.name, bytes: file.size, em: new Date().toLocaleString("pt-BR") });
     limparAnalise();
     const primeira = wb.SheetNames[0] ?? "";
     setAba(primeira);
-    lerAba(wb, primeira);
+    lerAba(wb, primeira, fonte);
   }
 
-  function lerAba(wb: XLSX.WorkBook, nome: string) {
+  function lerAba(wb: XLSX.WorkBook, nome: string, f: FonteKey) {
     const sheet = wb.Sheets[nome];
     if (!sheet) return;
-    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "", raw: false });
+    const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+      defval: "",
+      raw: false,
+    });
     const cols = Object.keys(json[0] ?? {});
+    const bloqueadas = detectarCamposSensiveis(cols);
     setColunas(cols);
-    setLinhas(json.map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v ?? "").trim()]))));
-    // auto-mapeamento por semelhança de nome
-    const auto: Mapeamento = {};
-    for (const campo of CAMPOS) {
-      const alvo = normaliza(campo.key);
-      const achou = cols.find((c) => {
-        const n = normaliza(c);
-        return (
-          n === alvo ||
-          n.includes(alvo) ||
-          (campo.key === "area" && (n.includes("SETOR") || n.includes("AREA"))) ||
-          (campo.key === "re" && (n === "RE" || n.includes("MATRIC"))) ||
-          (campo.key === "funcao" && n.includes("FUNC")) ||
-          (campo.key === "lider" && n.includes("LIDER"))
-        );
-      });
-      if (achou) auto[campo.key] = achou;
-    }
-    setMapeamento(auto);
+    setIgnoradas(bloqueadas);
+    setLinhas(
+      json.map((r) =>
+        Object.fromEntries(Object.entries(r).map(([k, v]) => [k, String(v ?? "").trim()])),
+      ),
+    );
+    setMapeamento(autoMapear(cols, f));
   }
 
   const catOk = cat.data && emp.data;
 
   function validar() {
     if (!catOk) return;
-    const faltando = CAMPOS.filter((c) => c.obrigatorio && !mapeamento[c.key]);
+    const faltando = campos.filter((c) => c.obrigatorio && !mapeamento[c.key as CampoKey]);
     if (faltando.length) {
       toast.error(`Mapeie: ${faltando.map((f) => f.label).join(", ")}`);
       return;
     }
-    const resultado = classificar(
+    const resultadoAnalise = classificar(
       linhas,
       mapeamento,
       emp.data!,
       cat.data!.areas,
       cat.data!.turnos,
       cat.data!.funcoes,
+      fonte,
     );
-    setAnalisado(resultado);
+    setAnalisado(resultadoAnalise);
+    setResultado(null);
     setDecisoes(
       Object.fromEntries(
-        resultado
+        resultadoAnalise
           .filter((l) => l.classificacao === "MUDANCA_DE_SETOR")
-          .map((l) => [l.linha, { tipo: "DEFINITIVA", fim: "" } as DecisaoSetor]),
+          .map((l) => [l.linha, { tipo: "DEFINITIVA", inicio: hoje(), fim: "" } as DecisaoSetor]),
       ),
     );
-    toast.success(`${resultado.length} linha(s) analisada(s). Nada foi gravado ainda.`);
+    toast.success(
+      `${resultadoAnalise.length} linha(s) analisada(s). Nada foi gravado — decida linha a linha.`,
+    );
   }
 
   const resumo = useMemo(() => {
@@ -182,19 +216,88 @@ function ImportarPage() {
     return r;
   }, [analisado]);
 
-  const selecionadas = useMemo(() => (analisado ?? []).filter((l) => l.aplicar), [analisado]);
-  const pendentesSetor = selecionadas.filter((l) => l.classificacao === "MUDANCA_DE_SETOR").length;
-  const visiveis = useMemo(
-    () => (analisado ?? []).filter((l) => filtro === "TODAS" || l.classificacao === filtro),
-    [analisado, filtro],
+  const aprovadas = useMemo(
+    () => (analisado ?? []).filter((l) => l.decisao === "APROVADA"),
+    [analisado],
   );
 
-  const decisaoInvalida = selecionadas.some(
-    (l) =>
-      l.classificacao === "MUDANCA_DE_SETOR" &&
-      decisoes[l.linha]?.tipo === "TEMPORARIA" &&
-      !decisoes[l.linha]?.fim,
-  );
+  const visiveis = useMemo(() => {
+    return (analisado ?? []).filter((l) => {
+      if (fClasse !== TODAS && l.classificacao !== fClasse) return false;
+      if (fArea !== TODAS && normaliza(l.dados["area"] ?? "") !== normaliza(fArea)) return false;
+      if (fTurno !== TODAS && normaliza(l.dados["turno"] ?? "") !== normaliza(fTurno)) return false;
+      if (fStatus !== TODAS && normaliza(l.dados["status"] ?? "") !== normaliza(fStatus))
+        return false;
+      if (fValida === "VALIDA" && l.erros.length) return false;
+      if (fValida === "INVALIDA" && !l.erros.length) return false;
+      if (fDecisao !== TODAS && l.decisao !== fDecisao) return false;
+      return true;
+    });
+  }, [analisado, fClasse, fArea, fTurno, fStatus, fValida, fDecisao]);
+
+  const opcoes = (campo: string) =>
+    Array.from(new Set((analisado ?? []).map((l) => l.dados[campo] ?? "").filter(Boolean))).sort();
+
+  function definirDecisao(linha: number, decisao: LinhaImportada["decisao"]) {
+    setAnalisado((prev) =>
+      (prev ?? []).map((l) =>
+        l.linha === linha ? { ...l, decisao, aplicar: decisao === "APROVADA" } : l,
+      ),
+    );
+  }
+
+  function aprovarValidas() {
+    setAnalisado((prev) =>
+      (prev ?? []).map((l) =>
+        podeAprovar(l) && !l.erros.length
+          ? { ...l, decisao: "APROVADA" as const, aplicar: true }
+          : l,
+      ),
+    );
+    toast.success("Todas as linhas válidas foram aprovadas na prévia.");
+  }
+
+  function cancelarLote() {
+    setAnalisado(null);
+    setDecisoes({});
+    setResultado(null);
+    toast.info("Lote cancelado. Nada foi gravado.");
+  }
+
+  function salvarCorrecao() {
+    if (!corrigindo || !catOk) return;
+    const brutas = linhas.map((b, i) =>
+      i + 2 === corrigindo.linha
+        ? Object.fromEntries(
+            Object.entries(b).map(([k, v]) => {
+              const campo = (Object.keys(mapeamento) as CampoKey[]).find(
+                (ck) => mapeamento[ck] === k,
+              );
+              return [k, campo && rascunho[campo] !== undefined ? rascunho[campo]! : v];
+            }),
+          )
+        : b,
+    );
+    setLinhas(brutas);
+    const novo = classificar(
+      brutas,
+      mapeamento,
+      emp.data!,
+      cat.data!.areas,
+      cat.data!.turnos,
+      cat.data!.funcoes,
+      fonte,
+    );
+    setAnalisado((prev) =>
+      (prev ?? []).map((l) => {
+        if (l.linha !== corrigindo.linha) return l;
+        const atualizado = novo.find((n) => n.linha === l.linha)!;
+        return { ...atualizado, justificativa: l.justificativa || "Linha corrigida na prévia" };
+      }),
+    );
+    setCorrigindo(null);
+    toast.success("Linha corrigida. Reclassificada na prévia.");
+  }
 
   async function salvarModelo() {
     if (!nomeModelo.trim()) {
@@ -203,15 +306,20 @@ function ImportarPage() {
     }
     const { data, error } = await supabase
       .from("import_templates")
-      .insert({ nome: nomeModelo.trim(), mapeamento, created_by: user?.id ?? null })
-      .select("id, nome, mapeamento")
+      .insert({ nome: nomeModelo.trim(), fonte, mapeamento, created_by: user?.id ?? null })
+      .select("id, nome, fonte, mapeamento")
       .single();
     if (error || !data) {
       toast.error(error?.message ?? "Falha ao salvar o modelo.");
       return;
     }
     setModelos((m) => [
-      { id: data.id, nome: data.nome, mapeamento: (data.mapeamento ?? {}) as Mapeamento },
+      {
+        id: data.id,
+        nome: data.nome,
+        fonte: data.fonte ?? "PERSONALIZADO",
+        mapeamento: (data.mapeamento ?? {}) as Mapeamento,
+      },
       ...m,
     ]);
     setNomeModelo("");
@@ -226,8 +334,9 @@ function ImportarPage() {
       const { data: batch, error: erroBatch } = await supabase
         .from("import_batches")
         .insert({
-          arquivo_nome: arquivo,
+          arquivo_nome: arquivo?.nome ?? "",
           aba,
+          fonte,
           status: "APROVADO",
           mapeamento,
           total_linhas: analisado.length,
@@ -248,8 +357,12 @@ function ImportarPage() {
           diferencas: l.diferencas,
           erros: l.erros,
           employee_id: l.employee_id,
-          aplicar: l.aplicar,
+          aplicar: l.decisao === "APROVADA",
+          decisao: l.decisao,
+          justificativa: l.justificativa || null,
+          campos_ignorados: ignoradas.map((c) => c.coluna),
           setor_decisao: decisoes[l.linha]?.tipo ?? null,
+          setor_decisao_inicio: decisoes[l.linha]?.inicio || null,
           setor_decisao_fim: decisoes[l.linha]?.fim || null,
         })),
       );
@@ -273,17 +386,38 @@ function ImportarPage() {
         return data.id;
       };
 
-      let aplicadas = 0;
-      let pendentes = 0;
+      const conta: Resultado = {
+        rejeitados: analisado.filter((l) => l.decisao === "REJEITADA").length,
+        movimentacoes: 0,
+      };
+      const soma = (k: string) => {
+        conta[k] = (conta[k] ?? 0) + 1;
+      };
 
       for (const l of analisado) {
-        if (!l.aplicar) continue;
+        if (l.decisao !== "APROVADA") continue;
         const d = l.dados;
         const areaId = await garantir("areas", areas, d["area"] ?? "");
         const turnoId = await garantir("shifts", turnos, d["turno"] ?? "");
         const funcaoId = await garantir("functions", funcoes, d["funcao"] ?? "");
 
+        if (l.classificacao === "VAGA_ABERTA") {
+          const { error } = await supabase.from("job_openings").insert({
+            codigo: d["vaga_id"] || `VAGA-${batch.id.slice(0, 8)}-${l.linha}`,
+            area_id: areaId,
+            shift_id: turnoId,
+            function_id: funcaoId,
+            status: "ABERTA",
+            observacao: d["observacoes"] || `Importação ${arquivo?.nome ?? ""}`,
+            created_by: user?.id ?? null,
+          });
+          if (error) throw error;
+          soma("VAGA_ABERTA");
+          continue;
+        }
+
         if (l.classificacao === "NOVO_COLABORADOR") {
+          // Registro nasce pendente de aprovação formal e a aprovação manual fica auditada.
           const novo: TablesInsert<"employees"> = {
             re: d["re"]!,
             nome: d["nome"]!,
@@ -294,23 +428,76 @@ function ImportarPage() {
             data_admissao: toISO(d["data_admissao"] ?? ""),
           };
           if (d["unidade"]) novo.unidade = d["unidade"];
-          const { error } = await supabase.from("employees").insert(novo);
+          const { data: criado, error } = await supabase
+            .from("employees")
+            .insert(novo)
+            .select("id")
+            .single();
           if (error) throw error;
-          aplicadas++;
-        } else if (l.classificacao === "DESLIGAMENTO" && l.employee_id) {
+          await supabase.from("approvals").insert({
+            entidade: "employees",
+            entidade_id: criado.id,
+            status: "APROVADO",
+            area_id: areaId,
+            solicitado_por: user?.id ?? null,
+            decidido_por: user?.id ?? null,
+            decidido_em: new Date().toISOString(),
+            justificativa:
+              l.justificativa || `Novo colaborador aprovado manualmente na importação ${arquivo?.nome ?? ""}`,
+          });
+          soma("NOVO_COLABORADOR");
+          continue;
+        }
+
+        if (!l.employee_id) continue;
+
+        if (l.classificacao === "DESLIGAMENTO") {
+          const data = toISO(d["data_desligamento"] ?? "");
+          if (!data && !l.justificativa) {
+            toast.warning(`Linha ${l.linha}: desligamento sem data exige justificativa. Ignorada.`);
+            continue;
+          }
           const { error } = await supabase
             .from("employees")
-            .update({
-              status: "DESLIGADO",
-              data_desligamento: toISO(d["data_desligamento"] ?? "") ?? hoje(),
-            })
+            .update({ status: "DESLIGADO", data_desligamento: data ?? hoje() })
             .eq("id", l.employee_id);
           if (error) throw error;
-          aplicadas++;
-        } else if (l.classificacao === "MUDANCA_DE_SETOR" && l.employee_id) {
+          soma("DESLIGAMENTO");
+        } else if (l.classificacao === "AFASTAMENTO") {
+          const { error } = await supabase
+            .from("employees")
+            .update({ status: "AFASTADO" })
+            .eq("id", l.employee_id);
+          if (error) throw error;
+          soma("AFASTAMENTO");
+        } else if (
+          l.classificacao === "RETORNO_DE_AFASTAMENTO" ||
+          l.classificacao === "REATIVACAO"
+        ) {
+          const { error } = await supabase
+            .from("employees")
+            .update({ status: "ATIVO", data_desligamento: null })
+            .eq("id", l.employee_id);
+          if (error) throw error;
+          soma(l.classificacao);
+        } else if (l.classificacao === "MUDANCA_DE_SETOR") {
           const atual = emp.data?.find((e) => e.id === l.employee_id);
-          const decisao = decisoes[l.linha] ?? { tipo: "DEFINITIVA", fim: "" };
-          const temporaria = decisao.tipo === "TEMPORARIA";
+          const decisao = decisoes[l.linha] ?? {
+            tipo: "DEFINITIVA" as DecisaoSetorTipo,
+            inicio: hoje(),
+            fim: "",
+          };
+          if (decisao.tipo === "IGNORAR") continue;
+          if (decisao.tipo === "CORRECAO_CADASTRAL") {
+            const { error } = await supabase
+              .from("employees")
+              .update({ area_id: areaId, shift_id: turnoId ?? atual?.shift_id ?? null })
+              .eq("id", l.employee_id);
+            if (error) throw error;
+            soma("ATUALIZACAO_CADASTRAL");
+            continue;
+          }
+          const temporaria = decisao.tipo !== "DEFINITIVA";
           const { error } = await supabase.from("employee_movements").insert({
             employee_id: l.employee_id,
             re: d["re"]!,
@@ -318,24 +505,31 @@ function ImportarPage() {
             area_destino_id: areaId,
             shift_origem_id: atual?.shift_id ?? null,
             shift_destino_id: turnoId ?? atual?.shift_id ?? null,
-            data_efetiva: hoje(),
-            tipo: temporaria ? "EMPRESTIMO_TEMPORARIO" : "TRANSFERENCIA_DEFINITIVA",
+            data_efetiva: decisao.inicio || hoje(),
+            tipo:
+              decisao.tipo === "DEFINITIVA"
+                ? "TRANSFERENCIA_DEFINITIVA"
+                : decisao.tipo === "COBERTURA_FERIAS"
+                  ? "COBERTURA_DE_FERIAS"
+                  : "EMPRESTIMO_TEMPORARIO",
             temporaria,
             data_fim: temporaria ? decisao.fim : null,
-            motivo: `Importação ${arquivo}`,
+            motivo: l.justificativa || `Importação ${arquivo?.nome ?? ""}`,
             status: "PENDENTE",
             created_by: user?.id ?? null,
           });
           if (error) throw error;
-          pendentes++;
-        } else if (l.employee_id) {
-          const patch: TablesUpdate<"employees"> = { nome: d["nome"]! };
+          conta.movimentacoes += 1;
+          soma("MUDANCA_DE_SETOR");
+        } else {
+          const patch: TablesUpdate<"employees"> = {};
+          if (d["nome"]) patch["nome"] = d["nome"];
           if (l.classificacao === "MUDANCA_DE_TURNO") patch["shift_id"] = turnoId;
           if (l.classificacao === "MUDANCA_DE_FUNCAO") patch["function_id"] = funcaoId;
           if (d["lider"]) patch["lider"] = d["lider"];
           const { error } = await supabase.from("employees").update(patch).eq("id", l.employee_id);
           if (error) throw error;
-          aplicadas++;
+          soma(l.classificacao);
         }
       }
 
@@ -344,11 +538,14 @@ function ImportarPage() {
         .update({ status: "APLICADO", aplicado_em: new Date().toISOString() })
         .eq("id", batch.id);
 
+      conta["TOTAL"] = analisado.length;
+      conta["SEM_ALTERACAO"] = analisado.filter((l) => l.classificacao === "SEM_ALTERACAO").length;
+      conta["INVALIDOS"] = analisado.filter((l) => l.erros.length).length;
+      setResultado(conta);
       qc.invalidateQueries();
-      toast.success(
-        `${aplicadas} alteração(ões) aplicada(s). ${pendentes} mudança(s) de setor aguardando aprovação.`,
-      );
-      limparAnalise();
+      toast.success("Lote processado. Veja o resultado abaixo.");
+      setAnalisado(null);
+      setDecisoes({});
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Falha ao aplicar importação.");
     } finally {
@@ -366,56 +563,145 @@ function ImportarPage() {
     );
   }
 
+  const decisaoInvalida = aprovadas.some((l) => {
+    if (l.classificacao !== "MUDANCA_DE_SETOR") return false;
+    const d = decisoes[l.linha];
+    if (!d) return false;
+    if (d.tipo === "IGNORAR" || d.tipo === "CORRECAO_CADASTRAL") return false;
+    if (!d.inicio) return true;
+    return d.tipo !== "DEFINITIVA" && !d.fim;
+  });
+
   return (
     <AppShell>
       <div className="space-y-4">
         <div>
           <h1 className="text-xl font-semibold tracking-tight text-foreground">Importar base</h1>
           <p className="text-sm text-muted-foreground">
-            xlsx, xlsm ou csv — escolha a aba, mapeie as colunas, valide, compare e aprove antes de
-            aplicar. Nada é gravado até a confirmação final. Ausência no arquivo nunca desliga
-            ninguém.
+            Compare a extração recebida com a base atual antes de aplicar. Nada é gravado até a
+            confirmação final; ausência no arquivo nunca desliga ninguém.
           </p>
         </div>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">1. Arquivo e aba</CardTitle>
+            <CardTitle className="text-sm">1. Fonte, arquivo e aba</CardTitle>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label>Arquivo</Label>
-              <Input
-                type="file"
-                accept=".xlsx,.xlsm,.csv"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void carregarArquivo(f);
-                }}
-              />
-            </div>
-            {workbook && (
+          <CardContent className="space-y-3">
+            <div className="grid gap-3 sm:grid-cols-3">
               <div className="space-y-1">
-                <Label>Aba</Label>
+                <Label>Tipo de importação</Label>
                 <Select
-                  value={aba}
+                  value={fonte}
                   onValueChange={(v) => {
-                    setAba(v);
-                    lerAba(workbook, v);
+                    const nova = v as FonteKey;
+                    setFonte(nova);
                     limparAnalise();
+                    if (workbook && aba) lerAba(workbook, aba, nova);
                   }}
                 >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {workbook.SheetNames.map((n) => (
-                      <SelectItem key={n} value={n}>
-                        {n}
+                    {FONTES.map((f) => (
+                      <SelectItem key={f.key} value={f.key}>
+                        {f.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1">
+                <Label>Arquivo (xlsx, xlsm, csv)</Label>
+                <Input
+                  type="file"
+                  accept=".xlsx,.xlsm,.csv"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) void carregarArquivo(f);
+                  }}
+                />
+              </div>
+              {workbook && (
+                <div className="space-y-1">
+                  <Label>Aba</Label>
+                  <Select
+                    value={aba}
+                    onValueChange={(v) => {
+                      setAba(v);
+                      lerAba(workbook, v, fonte);
+                      limparAnalise();
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {workbook.SheetNames.map((n) => (
+                        <SelectItem key={n} value={n}>
+                          {n}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              {FONTES.find((f) => f.key === fonte)?.descricao}
+            </p>
+
+            {arquivo && workbook && (
+              <div className="grid gap-2 rounded-lg border border-border p-3 text-xs sm:grid-cols-3 lg:grid-cols-4">
+                <div>
+                  <span className="text-muted-foreground">Arquivo</span>
+                  <p className="font-medium text-foreground">{arquivo.nome}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Tamanho</span>
+                  <p className="font-medium text-foreground">{tamanho(arquivo.bytes)}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Abas</span>
+                  <p className="font-medium text-foreground">{workbook.SheetNames.length}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Aba selecionada</span>
+                  <p className="font-medium text-foreground">{aba || "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Linhas</span>
+                  <p className="font-medium text-foreground">{linhas.length}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Responsável</span>
+                  <p className="font-medium text-foreground">{user?.email ?? "—"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Carregado em</span>
+                  <p className="font-medium text-foreground">{arquivo.em}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Gravação</span>
+                  <p className="font-medium text-foreground">Nenhuma até a confirmação</p>
+                </div>
+              </div>
+            )}
+
+            {ignoradas.length > 0 && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-xs">
+                <p className="font-medium text-amber-700 dark:text-amber-400">
+                  {ignoradas.length} coluna(s) não serão importadas
+                </p>
+                <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                  {ignoradas.map((c) => (
+                    <li key={c.coluna}>
+                      <strong>{c.coluna}</strong>: {c.motivo}
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
           </CardContent>
@@ -445,7 +731,7 @@ function ImportarPage() {
                     <SelectContent>
                       {modelos.map((m) => (
                         <SelectItem key={m.id} value={m.id}>
-                          {m.nome}
+                          {m.nome} · {humaniza(m.fonte)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -453,14 +739,14 @@ function ImportarPage() {
                 </div>
               )}
               <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                {CAMPOS.map((c) => (
+                {campos.map((c) => (
                   <div key={c.key} className="space-y-1">
                     <Label className="text-xs">
                       {c.label}
                       {c.obrigatorio && <span className="text-destructive"> *</span>}
                     </Label>
                     <Select
-                      value={mapeamento[c.key] ?? NENHUM}
+                      value={mapeamento[c.key as CampoKey] ?? NENHUM}
                       onValueChange={(v) =>
                         setMapeamento((m) => ({
                           ...m,
@@ -473,11 +759,13 @@ function ImportarPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value={NENHUM}>—</SelectItem>
-                        {colunas.map((col) => (
-                          <SelectItem key={col} value={col}>
-                            {col}
-                          </SelectItem>
-                        ))}
+                        {colunas
+                          .filter((col) => !ignoradas.some((i) => i.coluna === col))
+                          .map((col) => (
+                            <SelectItem key={col} value={col}>
+                              {col}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -488,12 +776,12 @@ function ImportarPage() {
                   <Label className="text-xs">Salvar modelo de mapeamento</Label>
                   <Input
                     className="max-w-xs"
-                    placeholder="Ex.: Base RH mensal"
+                    placeholder="Ex.: SAP mensal — ativos"
                     value={nomeModelo}
                     onChange={(e) => setNomeModelo(e.target.value)}
                   />
                 </div>
-                <Button variant="outline" onClick={salvarModelo}>
+                <Button variant="outline" onClick={() => void salvarModelo()}>
                   Salvar modelo
                 </Button>
                 <Button onClick={validar} disabled={!catOk}>
@@ -501,7 +789,8 @@ function ImportarPage() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Prévia: {linhas.length} linha(s) na aba selecionada.
+                Prévia: {linhas.length} linha(s) na aba selecionada. Aliases de cabeçalho (Número
+                Pessoal, Matrícula, Real/Planejado, Turno Plan…) são reconhecidos automaticamente.
               </p>
             </CardContent>
           </Card>
@@ -510,14 +799,14 @@ function ImportarPage() {
         {analisado && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">3. Prévia, comparação e aprovação</CardTitle>
+              <CardTitle className="text-sm">3. Comparação e decisão por linha</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setFiltro("TODAS")}
-                  className={`rounded px-2 py-1 text-xs ${filtro === "TODAS" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
+                  onClick={() => setFClasse(TODAS)}
+                  className={`rounded px-2 py-1 text-xs ${fClasse === TODAS ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}
                 >
                   Todas: {analisado.length}
                 </button>
@@ -525,124 +814,252 @@ function ImportarPage() {
                   <button
                     type="button"
                     key={k}
-                    onClick={() => setFiltro(filtro === k ? "TODAS" : k)}
-                    className={`rounded px-2 py-1 text-xs ${CLASSE_COR[k as keyof typeof CLASSE_COR]} ${filtro === k ? "ring-2 ring-ring" : ""}`}
+                    onClick={() => setFClasse(fClasse === k ? TODAS : k)}
+                    className={`rounded px-2 py-1 text-xs ${CLASSE_COR[k as keyof typeof CLASSE_COR]} ${fClasse === k ? "ring-2 ring-ring" : ""}`}
                   >
                     {humaniza(k)}: {v}
                   </button>
                 ))}
               </div>
 
-              <div className="max-h-[420px] overflow-auto rounded-lg border border-border">
+              <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                {[
+                  { label: "Área", value: fArea, set: setFArea, itens: opcoes("area") },
+                  { label: "Turno", value: fTurno, set: setFTurno, itens: opcoes("turno") },
+                  { label: "Status", value: fStatus, set: setFStatus, itens: opcoes("status") },
+                  {
+                    label: "Validação",
+                    value: fValida,
+                    set: setFValida,
+                    itens: ["VALIDA", "INVALIDA"],
+                  },
+                  {
+                    label: "Decisão",
+                    value: fDecisao,
+                    set: setFDecisao,
+                    itens: ["PENDENTE", "APROVADA", "REJEITADA", "IGNORADA"],
+                  },
+                ].map((f) => (
+                  <div key={f.label} className="space-y-1">
+                    <Label className="text-xs">{f.label}</Label>
+                    <Select value={f.value} onValueChange={(v) => f.set(v)}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={TODAS}>Todos</SelectItem>
+                        {f.itens.map((i) => (
+                          <SelectItem key={i} value={i}>
+                            {humaniza(i)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+
+              <div className="max-h-[460px] overflow-auto rounded-lg border border-border">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-card text-left uppercase text-muted-foreground">
                     <tr className="border-b border-border">
-                      <th className="p-2">Aplicar</th>
-                      <th className="p-2">Linha</th>
                       <th className="p-2">RE</th>
-                      <th className="p-2">Nome</th>
+                      <th className="p-2">Colaborador</th>
                       <th className="p-2">Classificação</th>
-                      <th className="p-2">Diferenças / Erros</th>
-                      <th className="p-2">Decisão do setor</th>
+                      <th className="p-2">Campo alterado</th>
+                      <th className="p-2">Valor atual</th>
+                      <th className="p-2">Valor recebido</th>
+                      <th className="p-2">Ação sugerida</th>
+                      <th className="p-2">Decisão</th>
+                      <th className="p-2">Justificativa</th>
+                      <th className="p-2">Validação</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visiveis.map((l) => (
-                      <tr key={l.linha} className="border-b border-border/60">
-                        <td className="p-2">
-                          <Checkbox
-                            checked={l.aplicar}
-                            disabled={
-                              l.classificacao === "DADO_INVALIDO" ||
-                              l.classificacao === "DUPLICIDADE"
-                            }
-                            onCheckedChange={(c) =>
-                              setAnalisado((prev) =>
-                                (prev ?? []).map((x) =>
-                                  x.linha === l.linha ? { ...x, aplicar: !!c } : x,
-                                ),
-                              )
-                            }
-                          />
-                        </td>
-                        <td className="p-2 text-muted-foreground">{l.linha}</td>
-                        <td className="p-2">{l.dados["re"]}</td>
-                        <td className="p-2">{l.dados["nome"]}</td>
-                        <td className="p-2">
-                          <span className={`rounded px-1.5 py-0.5 ${CLASSE_COR[l.classificacao]}`}>
-                            {humaniza(l.classificacao)}
-                          </span>
-                        </td>
-                        <td className="p-2 text-muted-foreground">
-                          {l.erros.length > 0
-                            ? l.erros.join("; ")
-                            : Object.entries(l.diferencas)
-                                .map(([c, d]) => `${c}: ${d.de ?? "—"} → ${d.para}`)
-                                .join("; ") || "—"}
-                        </td>
-                        <td className="p-2">
-                          {l.classificacao === "MUDANCA_DE_SETOR" ? (
-                            <div className="flex items-center gap-2">
-                              <Select
-                                value={decisoes[l.linha]?.tipo ?? "DEFINITIVA"}
-                                onValueChange={(v) =>
-                                  setDecisoes((prev) => ({
-                                    ...prev,
-                                    [l.linha]: {
-                                      tipo: v as DecisaoSetor["tipo"],
-                                      fim: prev[l.linha]?.fim ?? "",
-                                    },
-                                  }))
-                                }
-                              >
-                                <SelectTrigger className="h-7 w-[130px] text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="DEFINITIVA">Definitiva</SelectItem>
-                                  <SelectItem value="TEMPORARIA">Temporária</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              {decisoes[l.linha]?.tipo === "TEMPORARIA" && (
-                                <Input
-                                  type="date"
-                                  className="h-7 w-[140px] text-xs"
-                                  value={decisoes[l.linha]?.fim ?? ""}
-                                  onChange={(e) =>
+                    {visiveis.map((l) => {
+                      const difs = Object.entries(l.diferencas);
+                      return (
+                        <tr key={l.linha} className="border-b border-border/60 align-top">
+                          <td className="p-2">{l.dados["re"] || "—"}</td>
+                          <td className="p-2">{l.dados["nome"] || l.dados["vaga_id"] || "—"}</td>
+                          <td className="p-2">
+                            <span
+                              className={`rounded px-1.5 py-0.5 ${CLASSE_COR[l.classificacao]}`}
+                            >
+                              {humaniza(l.classificacao)}
+                            </span>
+                          </td>
+                          <td className="p-2 text-muted-foreground">
+                            {difs.map(([c]) => humaniza(c)).join(", ") || "—"}
+                          </td>
+                          <td className="p-2 text-muted-foreground">
+                            {difs.map(([, d]) => d.de ?? "—").join(", ") || "—"}
+                          </td>
+                          <td className="p-2">{difs.map(([, d]) => d.para).join(", ") || "—"}</td>
+                          <td className="p-2 text-muted-foreground">
+                            {ACAO_SUGERIDA[l.classificacao]}
+                            {l.classificacao === "MUDANCA_DE_SETOR" && (
+                              <div className="mt-1 flex flex-wrap items-center gap-1">
+                                <Select
+                                  value={decisoes[l.linha]?.tipo ?? "DEFINITIVA"}
+                                  onValueChange={(v) =>
                                     setDecisoes((prev) => ({
                                       ...prev,
-                                      [l.linha]: { tipo: "TEMPORARIA", fim: e.target.value },
+                                      [l.linha]: {
+                                        tipo: v as DecisaoSetorTipo,
+                                        inicio: prev[l.linha]?.inicio ?? hoje(),
+                                        fim: prev[l.linha]?.fim ?? "",
+                                      },
                                     }))
                                   }
-                                />
-                              )}
+                                >
+                                  <SelectTrigger className="h-7 w-[150px] text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="DEFINITIVA">
+                                      Transferência definitiva
+                                    </SelectItem>
+                                    <SelectItem value="TEMPORARIA">Empréstimo temporário</SelectItem>
+                                    <SelectItem value="COBERTURA_FERIAS">
+                                      Cobertura de férias
+                                    </SelectItem>
+                                    <SelectItem value="CORRECAO_CADASTRAL">
+                                      Correção cadastral
+                                    </SelectItem>
+                                    <SelectItem value="IGNORAR">Ignorar alteração</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                {decisoes[l.linha]?.tipo !== "IGNORAR" &&
+                                  decisoes[l.linha]?.tipo !== "CORRECAO_CADASTRAL" && (
+                                    <Input
+                                      type="date"
+                                      title="Data efetiva"
+                                      className="h-7 w-[135px] text-xs"
+                                      value={decisoes[l.linha]?.inicio ?? ""}
+                                      onChange={(e) =>
+                                        setDecisoes((prev) => ({
+                                          ...prev,
+                                          [l.linha]: {
+                                            tipo: prev[l.linha]?.tipo ?? "DEFINITIVA",
+                                            inicio: e.target.value,
+                                            fim: prev[l.linha]?.fim ?? "",
+                                          },
+                                        }))
+                                      }
+                                    />
+                                  )}
+                                {(decisoes[l.linha]?.tipo === "TEMPORARIA" ||
+                                  decisoes[l.linha]?.tipo === "COBERTURA_FERIAS") && (
+                                  <Input
+                                    type="date"
+                                    title="Data final"
+                                    className="h-7 w-[135px] text-xs"
+                                    value={decisoes[l.linha]?.fim ?? ""}
+                                    onChange={(e) =>
+                                      setDecisoes((prev) => ({
+                                        ...prev,
+                                        [l.linha]: {
+                                          tipo: prev[l.linha]?.tipo ?? "TEMPORARIA",
+                                          inicio: prev[l.linha]?.inicio ?? hoje(),
+                                          fim: e.target.value,
+                                        },
+                                      }))
+                                    }
+                                  />
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-2">
+                            <div className="flex flex-wrap gap-1">
+                              <Button
+                                size="sm"
+                                variant={l.decisao === "APROVADA" ? "default" : "outline"}
+                                className="h-6 px-2 text-[11px]"
+                                disabled={!podeAprovar(l)}
+                                onClick={() => definirDecisao(l.linha, "APROVADA")}
+                              >
+                                Aprovar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={l.decisao === "REJEITADA" ? "destructive" : "outline"}
+                                className="h-6 px-2 text-[11px]"
+                                onClick={() => definirDecisao(l.linha, "REJEITADA")}
+                              >
+                                Rejeitar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant={l.decisao === "IGNORADA" ? "secondary" : "outline"}
+                                className="h-6 px-2 text-[11px]"
+                                onClick={() => definirDecisao(l.linha, "IGNORADA")}
+                              >
+                                Ignorar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-2 text-[11px]"
+                                onClick={() => {
+                                  setCorrigindo(l);
+                                  setRascunho({ ...l.dados });
+                                }}
+                              >
+                                Corrigir
+                              </Button>
                             </div>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                          </td>
+                          <td className="p-2">
+                            <Input
+                              className="h-7 w-[160px] text-xs"
+                              placeholder="Justificativa"
+                              value={l.justificativa}
+                              onChange={(e) =>
+                                setAnalisado((prev) =>
+                                  (prev ?? []).map((x) =>
+                                    x.linha === l.linha
+                                      ? { ...x, justificativa: e.target.value }
+                                      : x,
+                                  ),
+                                )
+                              }
+                            />
+                          </td>
+                          <td className="p-2">
+                            {l.erros.length ? (
+                              <span className="text-destructive">{l.erros.join("; ")}</span>
+                            ) : (
+                              <span className="text-emerald-600 dark:text-emerald-400">Válida</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
+                <Button variant="outline" onClick={aprovarValidas} disabled={aplicando}>
+                  Aprovar todas as válidas
+                </Button>
                 <Button
                   onClick={() => setConfirmando(true)}
-                  disabled={aplicando || selecionadas.length === 0 || decisaoInvalida}
+                  disabled={aplicando || aprovadas.length === 0 || decisaoInvalida}
                 >
-                  {aplicando ? "Aplicando…" : `Aprovar e aplicar (${selecionadas.length})`}
+                  {aplicando ? "Processando…" : `Processar aprovadas (${aprovadas.length})`}
                 </Button>
-                <Button variant="outline" onClick={limparAnalise} disabled={aplicando}>
-                  Descartar prévia
+                <Button variant="ghost" onClick={cancelarLote} disabled={aplicando}>
+                  Cancelar lote
                 </Button>
                 <Badge variant="secondary" className="text-[10px]">
-                  Mudanças de setor entram como movimentação pendente
+                  Mudanças de setor viram movimentação pendente de aprovação
                 </Badge>
                 {decisaoInvalida && (
                   <span className="text-xs text-destructive">
-                    Informe a data final das mudanças de setor temporárias.
+                    Informe data efetiva (e data final nas temporárias) das mudanças de setor.
                   </span>
                 )}
               </div>
@@ -650,23 +1067,106 @@ function ImportarPage() {
           </Card>
         )}
 
+        {resultado && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm">Resultado do lote</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                {[
+                  ["Total analisado", resultado["TOTAL"]],
+                  ["Novos colaboradores", resultado["NOVO_COLABORADOR"]],
+                  ["Atualizações cadastrais", resultado["ATUALIZACAO_CADASTRAL"]],
+                  ["Movimentações", resultado.movimentacoes],
+                  ["Mudanças de turno", resultado["MUDANCA_DE_TURNO"]],
+                  ["Mudanças de função", resultado["MUDANCA_DE_FUNCAO"]],
+                  ["Mudanças de líder", resultado["MUDANCA_DE_LIDER"]],
+                  ["Afastamentos", resultado["AFASTAMENTO"]],
+                  ["Retornos", resultado["RETORNO_DE_AFASTAMENTO"]],
+                  ["Reativações", resultado["REATIVACAO"]],
+                  ["Desligamentos", resultado["DESLIGAMENTO"]],
+                  ["Vagas abertas", resultado["VAGA_ABERTA"]],
+                  ["Rejeitados", resultado.rejeitados],
+                  ["Inválidos", resultado["INVALIDOS"]],
+                  ["Sem alteração", resultado["SEM_ALTERACAO"]],
+                ].map(([label, valor]) => (
+                  <div key={String(label)} className="rounded-lg border border-border p-2">
+                    <p className="text-xs text-muted-foreground">{label}</p>
+                    <p className="text-lg font-semibold text-foreground">{Number(valor ?? 0)}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        <Dialog open={!!corrigindo} onOpenChange={(o) => !o && setCorrigindo(null)}>
+          <DialogContent className="max-h-[80vh] overflow-auto">
+            <DialogHeader>
+              <DialogTitle>Corrigir linha {corrigindo?.linha}</DialogTitle>
+              <DialogDescription>
+                Ajuste os valores recebidos. A linha é reclassificada na prévia; nada é gravado
+                agora.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {campos
+                .filter((c) => mapeamento[c.key as CampoKey])
+                .map((c) => (
+                  <div key={c.key} className="space-y-1">
+                    <Label className="text-xs">{c.label}</Label>
+                    <Input
+                      value={rascunho[c.key] ?? ""}
+                      onChange={(e) =>
+                        setRascunho((r) => ({ ...r, [c.key]: e.target.value }))
+                      }
+                    />
+                  </div>
+                ))}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Justificativa da correção</Label>
+              <Textarea
+                value={corrigindo?.justificativa ?? ""}
+                onChange={(e) =>
+                  setCorrigindo((c) => (c ? { ...c, justificativa: e.target.value } : c))
+                }
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCorrigindo(null)}>
+                Cancelar
+              </Button>
+              <Button onClick={salvarCorrecao}>Aplicar correção na prévia</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <AlertDialog open={confirmando} onOpenChange={setConfirmando}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar aplicação da importação</AlertDialogTitle>
+              <AlertDialogTitle>Confirmar processamento do lote</AlertDialogTitle>
               <AlertDialogDescription asChild>
                 <div className="space-y-2 text-sm">
                   <p>
-                    Até aqui nada foi gravado. Ao confirmar, o lote <strong>{arquivo}</strong> (aba{" "}
-                    {aba || "—"}) será registrado e as linhas selecionadas serão aplicadas.
+                    Até aqui nada foi gravado. Ao confirmar, o lote{" "}
+                    <strong>{arquivo?.nome ?? "—"}</strong> (aba {aba || "—"}) será registrado e
+                    apenas as linhas aprovadas serão aplicadas.
                   </p>
                   <ul className="list-disc pl-5">
-                    <li>{selecionadas.length} linha(s) selecionada(s) de {analisado?.length ?? 0}</li>
-                    <li>{pendentesSetor} mudança(s) de setor viram movimentação pendente</li>
                     <li>
-                      {selecionadas.filter((l) => l.classificacao === "DESLIGAMENTO").length}{" "}
-                      desligamento(s) por status/data no arquivo
+                      {aprovadas.length} linha(s) aprovada(s) de {analisado?.length ?? 0}
                     </li>
+                    <li>
+                      {aprovadas.filter((l) => l.classificacao === "MUDANCA_DE_SETOR").length}{" "}
+                      mudança(s) de setor viram movimentação pendente
+                    </li>
+                    <li>
+                      {aprovadas.filter((l) => l.classificacao === "DESLIGAMENTO").length}{" "}
+                      desligamento(s) com status ou data explícita
+                    </li>
+                    <li>Férias e movimentações existentes não são excluídas.</li>
                   </ul>
                 </div>
               </AlertDialogDescription>
@@ -674,7 +1174,7 @@ function ImportarPage() {
             <AlertDialogFooter>
               <AlertDialogCancel>Voltar</AlertDialogCancel>
               <AlertDialogAction onClick={() => void aplicar()}>
-                Confirmar e aplicar
+                Confirmar e processar
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
