@@ -38,6 +38,7 @@ import {
 import {
   ACOES_RAPIDAS,
   bloqueiosFechamento,
+  MARCA_DIVERGENCIA,
   montarPrevistos,
   resumir,
   statusClasse,
