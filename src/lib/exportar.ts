@@ -56,3 +56,13 @@ export function exportarXlsx(tabelas: Tabela[], parametros: (string | number)[][
     nomeArquivo(nome, "xlsx"),
   );
 }
+
+/** CSV com bloco de cabeçalho (indicador, filtros, data/hora, usuário) antes dos dados. */
+export function exportarCsvComCabecalho(t: Tabela, parametros: (string | number)[][], nome: string) {
+  const cabecalho = montarCsv({ nome: "Parâmetros", colunas: ["Parâmetro", "Valor"], linhas: parametros });
+  const corpo = montarCsv(t);
+  baixar(
+    new Blob([`\uFEFF${cabecalho}\r\n\r\n${corpo}`], { type: "text/csv;charset=utf-8" }),
+    nomeArquivo(nome, "csv"),
+  );
+}
