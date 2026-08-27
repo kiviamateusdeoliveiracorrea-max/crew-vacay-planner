@@ -48,6 +48,8 @@ import {
   classificar,
   detectarCamposSensiveis,
   podeAprovar,
+  linhaProcessavel,
+  validarDecisaoSetor,
   toISO,
   type CampoKey,
   type ColunaIgnorada,
@@ -395,7 +397,8 @@ function ImportarPage() {
       };
 
       for (const l of analisado) {
-        if (l.decisao !== "APROVADA") continue;
+        // Guarda final: linha inválida ou bloqueada nunca é gravada, mesmo marcada como aprovada.
+        if (!linhaProcessavel(l)) continue;
         const d = l.dados;
         const areaId = await garantir("areas", areas, d["area"] ?? "");
         const turnoId = await garantir("shifts", turnos, d["turno"] ?? "");
@@ -563,14 +566,7 @@ function ImportarPage() {
     );
   }
 
-  const decisaoInvalida = aprovadas.some((l) => {
-    if (l.classificacao !== "MUDANCA_DE_SETOR") return false;
-    const d = decisoes[l.linha];
-    if (!d) return false;
-    if (d.tipo === "IGNORAR" || d.tipo === "CORRECAO_CADASTRAL") return false;
-    if (!d.inicio) return true;
-    return d.tipo !== "DEFINITIVA" && !d.fim;
-  });
+  const decisaoInvalida = aprovadas.some((l) => !!validarDecisaoSetor(l, decisoes[l.linha]));
 
   return (
     <AppShell>
