@@ -549,32 +549,39 @@ function Painel() {
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {indicadores.map((i) => (
-                <button
+                <div
                   key={i.titulo}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setDrill(i.drill)}
-                  className="rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent/40"
+                  onKeyDown={(e) => e.key === "Enter" && setDrill(i.drill)}
+                  className="cursor-pointer rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent/40"
                 >
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{i.titulo}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      {i.titulo}
+                    </p>
+                    <Acoes drill={i.drill} />
+                  </div>
                   <p className={`mt-1 text-2xl font-semibold ${i.tom ?? "text-foreground"}`}>
                     {i.valor}
                   </p>
-                </button>
+                </div>
               ))}
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm">Férias por mês</CardTitle>
+                  <Acoes drill={drillGraficoMes} />
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {porMes.length === 0 && <p className="text-sm text-muted-foreground">Sem dados.</p>}
                   {porMes.map(([m, itens]) => (
                     <button
                       key={m}
-                      onClick={() =>
-                        setDrill({ titulo: `Férias iniciadas em ${m}`, tipo: "ferias", itens })
-                      }
+                      onClick={() => setDrill(drillMes(m, itens))}
                       className="flex w-full items-center gap-3 rounded-md px-2 py-1 text-left hover:bg-accent"
                     >
                       <span className="w-16 text-xs text-muted-foreground">{m}</span>
@@ -593,17 +600,16 @@ function Painel() {
               </Card>
 
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm">Férias por área</CardTitle>
+                  <Acoes drill={drillGraficoArea} />
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {porArea.length === 0 && <p className="text-sm text-muted-foreground">Sem dados.</p>}
                   {porArea.map(([id, itens]) => (
                     <button
                       key={id}
-                      onClick={() =>
-                        setDrill({ titulo: `Férias — ${nomeArea(id)}`, tipo: "ferias", itens })
-                      }
+                      onClick={() => setDrill(drillArea(id, itens))}
                       className="flex w-full items-center gap-3 rounded-md px-2 py-1 text-left hover:bg-accent"
                     >
                       <span className="w-40 truncate text-xs text-muted-foreground">
@@ -629,9 +635,12 @@ function Painel() {
                 <CardTitle className="text-sm">
                   Capacidade disponível por função e turno {mes ? `(${mes})` : "(mês atual)"}
                 </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setMes("")}>
-                  Limpar mês
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => setMes("")}>
+                    Limpar mês
+                  </Button>
+                  <Acoes drill={drillCapacidade} />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -654,8 +663,10 @@ function Painel() {
                             onClick={() =>
                               setDrill({
                                 titulo: `Férias — ${l.funcao} · turno ${l.turno}`,
+                                indicador: `Capacidade — ${l.funcao} · turno ${l.turno}`,
                                 tipo: "ferias",
                                 itens: l.itens,
+                                tabela: tFerias(l.itens),
                               })
                             }
                             className="cursor-pointer border-b border-border/60 hover:bg-accent/40"
@@ -701,6 +712,8 @@ function Painel() {
         data={drill}
         onClose={() => setDrill(null)}
         onAbrirRegistro={setFoco}
+        onExportar={(d, f) => void exportar(d, f)}
+        exportando={exportando}
         nomeArea={nomeArea}
         nomeTurno={nomeTurno}
         nomeFuncao={nomeFuncao}
