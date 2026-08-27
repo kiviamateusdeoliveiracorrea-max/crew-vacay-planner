@@ -1,5 +1,5 @@
 import { mensagemAutenticacao } from "@/lib/mensagens";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -73,21 +73,6 @@ function AuthPage() {
     navigate({ to: "/", replace: true });
   }
 
-  async function recuperar() {
-    if (!email) {
-      toast.error("Informe o e-mail corporativo para receber o link de recuperação.");
-      return;
-    }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
-    });
-    if (error) {
-      toast.error("Não foi possível enviar o link de recuperação agora. Tente novamente em alguns instantes.");
-      return;
-    }
-    toast.success("Se o e-mail estiver cadastrado, enviaremos um link de recuperação.");
-  }
-
   return (
     <main className="flex min-h-screen items-center justify-center bg-secondary px-4 py-10">
       <div className="w-full max-w-md">
@@ -149,13 +134,12 @@ function AuthPage() {
               >
                 {modo === "entrar" ? "Não tem acesso? Criar conta" : "Já tenho conta, entrar"}
               </button>
-              <button
-                type="button"
+              <Link
+                to="/recuperar-senha"
                 className="text-muted-foreground underline-offset-4 hover:underline"
-                onClick={recuperar}
               >
-                Recuperar acesso
-              </button>
+                Esqueci minha senha
+              </Link>
             </div>
           </CardContent>
         </Card>
