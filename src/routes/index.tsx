@@ -492,8 +492,13 @@ function Painel() {
     <AppShell>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Painel gerencial</h1>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Visão Geral · {UNIDADE_PADRAO}
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
+            Olá, <span className="capitalize">{(emailUsuario ?? "").split("@")[0]?.split(/[.\s]/)[0] || "usuário"}</span>. Confira as pendências e os principais indicadores da operação.
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
             Todos os indicadores são clicáveis e rastreáveis até o registro de origem e sua
             trilha de auditoria.
           </p>
