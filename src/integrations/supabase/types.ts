@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      absence_reasons: {
+        Row: {
+          active: boolean
+          category: Database["public"]["Enums"]["absence_category"]
+          code: string
+          counts_as_absence: boolean
+          created_at: string
+          id: string
+          name: string
+          requires_document: boolean
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          category?: Database["public"]["Enums"]["absence_category"]
+          code: string
+          counts_as_absence?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          requires_document?: boolean
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          category?: Database["public"]["Enums"]["absence_category"]
+          code?: string
+          counts_as_absence?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          requires_document?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       access_requests: {
         Row: {
           area_id: string | null
@@ -160,6 +196,298 @@ export type Database = {
             columns: ["unit_id"]
             isOneToOne: false
             referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_corrections: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          attendance_record_id: string
+          created_at: string
+          id: string
+          justification: string
+          new_reason: string | null
+          new_status: Database["public"]["Enums"]["attendance_status"]
+          previous_reason: string | null
+          previous_status:
+            | Database["public"]["Enums"]["attendance_status"]
+            | null
+          requested_by: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attendance_record_id: string
+          created_at?: string
+          id?: string
+          justification: string
+          new_reason?: string | null
+          new_status: Database["public"]["Enums"]["attendance_status"]
+          previous_reason?: string | null
+          previous_status?:
+            | Database["public"]["Enums"]["attendance_status"]
+            | null
+          requested_by?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          attendance_record_id?: string
+          created_at?: string
+          id?: string
+          justification?: string
+          new_reason?: string | null
+          new_status?: Database["public"]["Enums"]["attendance_status"]
+          previous_reason?: string | null
+          previous_status?:
+            | Database["public"]["Enums"]["attendance_status"]
+            | null
+          requested_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_corrections_attendance_record_id_fkey"
+            columns: ["attendance_record_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_corrections_new_reason_fkey"
+            columns: ["new_reason"]
+            isOneToOne: false
+            referencedRelation: "absence_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_corrections_previous_reason_fkey"
+            columns: ["previous_reason"]
+            isOneToOne: false
+            referencedRelation: "absence_reasons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_days: {
+        Row: {
+          area_id: string
+          attendance_date: string
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          opened_at: string
+          reopened_at: string | null
+          reopened_by: string | null
+          reopening_justification: string | null
+          responsible_user_id: string | null
+          shift_id: string | null
+          status: Database["public"]["Enums"]["attendance_day_status"]
+          unit_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          area_id: string
+          attendance_date?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          reopened_at?: string | null
+          reopened_by?: string | null
+          reopening_justification?: string | null
+          responsible_user_id?: string | null
+          shift_id?: string | null
+          status?: Database["public"]["Enums"]["attendance_day_status"]
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          area_id?: string
+          attendance_date?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          reopened_at?: string | null
+          reopened_by?: string | null
+          reopening_justification?: string | null
+          responsible_user_id?: string | null
+          shift_id?: string | null
+          status?: Database["public"]["Enums"]["attendance_day_status"]
+          unit_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_days_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_days_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_days_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_records: {
+        Row: {
+          absence_reason_id: string | null
+          arrival_time: string | null
+          attendance_day_id: string
+          attendance_status: Database["public"]["Enums"]["attendance_status"]
+          corrected_at: string | null
+          corrected_by: string | null
+          correction_justification: string | null
+          created_at: string
+          departure_time: string | null
+          document_presented: boolean
+          document_validation_status: Database["public"]["Enums"]["document_validation_status"]
+          effective_area_id: string | null
+          effective_shift_id: string | null
+          employee_id: string | null
+          employee_name_snapshot: string
+          employee_re: string
+          function_snapshot: string | null
+          id: string
+          minutes_late: number
+          notes: string | null
+          planned_area_id: string | null
+          planned_shift_id: string | null
+          registered_at: string
+          registered_by: string | null
+          source: string
+          updated_at: string
+        }
+        Insert: {
+          absence_reason_id?: string | null
+          arrival_time?: string | null
+          attendance_day_id: string
+          attendance_status?: Database["public"]["Enums"]["attendance_status"]
+          corrected_at?: string | null
+          corrected_by?: string | null
+          correction_justification?: string | null
+          created_at?: string
+          departure_time?: string | null
+          document_presented?: boolean
+          document_validation_status?: Database["public"]["Enums"]["document_validation_status"]
+          effective_area_id?: string | null
+          effective_shift_id?: string | null
+          employee_id?: string | null
+          employee_name_snapshot: string
+          employee_re: string
+          function_snapshot?: string | null
+          id?: string
+          minutes_late?: number
+          notes?: string | null
+          planned_area_id?: string | null
+          planned_shift_id?: string | null
+          registered_at?: string
+          registered_by?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Update: {
+          absence_reason_id?: string | null
+          arrival_time?: string | null
+          attendance_day_id?: string
+          attendance_status?: Database["public"]["Enums"]["attendance_status"]
+          corrected_at?: string | null
+          corrected_by?: string | null
+          correction_justification?: string | null
+          created_at?: string
+          departure_time?: string | null
+          document_presented?: boolean
+          document_validation_status?: Database["public"]["Enums"]["document_validation_status"]
+          effective_area_id?: string | null
+          effective_shift_id?: string | null
+          employee_id?: string | null
+          employee_name_snapshot?: string
+          employee_re?: string
+          function_snapshot?: string | null
+          id?: string
+          minutes_late?: number
+          notes?: string | null
+          planned_area_id?: string | null
+          planned_shift_id?: string | null
+          registered_at?: string
+          registered_by?: string | null
+          source?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_absence_reason_id_fkey"
+            columns: ["absence_reason_id"]
+            isOneToOne: false
+            referencedRelation: "absence_reasons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_attendance_day_id_fkey"
+            columns: ["attendance_day_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_effective_area_id_fkey"
+            columns: ["effective_area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_effective_shift_id_fkey"
+            columns: ["effective_shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_planned_area_id_fkey"
+            columns: ["planned_area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_records_planned_shift_id_fkey"
+            columns: ["planned_shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
         ]
@@ -1253,9 +1581,44 @@ export type Database = {
       }
     }
     Enums: {
+      absence_category:
+        | "FALTA"
+        | "JUSTIFICADA"
+        | "SAUDE"
+        | "ESCALA"
+        | "OPERACIONAL"
+        | "OUTRO"
       app_role: "ADMIN" | "ANALISTA" | "LIDER" | "COORDENADOR" | "GERENTE"
       approval_status: "PENDENTE" | "APROVADO" | "REJEITADO"
+      attendance_day_status:
+        | "ABERTA"
+        | "EM_PREENCHIMENTO"
+        | "FECHADA"
+        | "REABERTA"
+        | "CANCELADA"
+      attendance_status:
+        | "PENDENTE"
+        | "PRESENTE"
+        | "FALTA"
+        | "FALTA_JUSTIFICADA"
+        | "ATESTADO"
+        | "FERIAS"
+        | "AFASTADO"
+        | "FOLGA"
+        | "COMPENSACAO"
+        | "ATRASO"
+        | "SAIDA_ANTECIPADA"
+        | "TREINAMENTO"
+        | "APOIO_OUTRA_AREA"
+        | "HOME_OFFICE"
+        | "DESLIGADO"
+        | "NAO_PREVISTO"
       conflict_severity: "INFORMATIVO" | "ATENCAO" | "CRITICO" | "BLOQUEIO"
+      document_validation_status:
+        | "NAO_APLICAVEL"
+        | "PENDENTE"
+        | "VALIDADO"
+        | "REJEITADO"
       employee_status: "ATIVO" | "DESLIGADO" | "AFASTADO"
       import_row_class:
         | "NOVO_COLABORADOR"
@@ -1418,9 +1781,48 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      absence_category: [
+        "FALTA",
+        "JUSTIFICADA",
+        "SAUDE",
+        "ESCALA",
+        "OPERACIONAL",
+        "OUTRO",
+      ],
       app_role: ["ADMIN", "ANALISTA", "LIDER", "COORDENADOR", "GERENTE"],
       approval_status: ["PENDENTE", "APROVADO", "REJEITADO"],
+      attendance_day_status: [
+        "ABERTA",
+        "EM_PREENCHIMENTO",
+        "FECHADA",
+        "REABERTA",
+        "CANCELADA",
+      ],
+      attendance_status: [
+        "PENDENTE",
+        "PRESENTE",
+        "FALTA",
+        "FALTA_JUSTIFICADA",
+        "ATESTADO",
+        "FERIAS",
+        "AFASTADO",
+        "FOLGA",
+        "COMPENSACAO",
+        "ATRASO",
+        "SAIDA_ANTECIPADA",
+        "TREINAMENTO",
+        "APOIO_OUTRA_AREA",
+        "HOME_OFFICE",
+        "DESLIGADO",
+        "NAO_PREVISTO",
+      ],
       conflict_severity: ["INFORMATIVO", "ATENCAO", "CRITICO", "BLOQUEIO"],
+      document_validation_status: [
+        "NAO_APLICAVEL",
+        "PENDENTE",
+        "VALIDADO",
+        "REJEITADO",
+      ],
       employee_status: ["ATIVO", "DESLIGADO", "AFASTADO"],
       import_row_class: [
         "NOVO_COLABORADOR",
