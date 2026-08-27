@@ -70,7 +70,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MODELOS, VERSAO_MODELO, baixarModelo } from "@/lib/modelo-importacao";
-import { humaniza, normaliza } from "@/lib/sistema";
+import { normaliza } from "@/lib/sistema";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/importar")({

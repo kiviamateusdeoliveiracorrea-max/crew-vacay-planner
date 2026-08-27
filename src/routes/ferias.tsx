@@ -24,7 +24,6 @@ import { severidadeMax } from "@/lib/conflitos";
 import {
   diasEntre,
   fmtData,
-  humaniza,
   severidadeClasse,
   SEVERIDADE_LABEL,
 } from "@/lib/sistema";
