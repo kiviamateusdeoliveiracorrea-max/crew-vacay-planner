@@ -103,6 +103,13 @@ function ChamadaPage() {
   const [justificativa, setJustificativa] = useState("");
   const [historicoDe, setHistoricoDe] = useState<ChamadaRegistro | null>(null);
   const [correcaoDe, setCorrecaoDe] = useState<ChamadaRegistro | null>(null);
+  const [divergenciaDe, setDivergenciaDe] = useState<{
+    registro: ChamadaRegistro;
+    status: StatusPresenca;
+    motivo?: string | undefined;
+  } | null>(null);
+  const [tratativa, setTratativa] = useState("");
+
 
   const areas = useMemo(
     () =>
