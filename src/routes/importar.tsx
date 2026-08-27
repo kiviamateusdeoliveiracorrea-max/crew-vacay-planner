@@ -1151,7 +1151,8 @@ function ImportarPage() {
                 </Badge>
                 {decisaoInvalida && (
                   <span className="text-xs text-destructive">
-                    Informe data efetiva (e data final nas temporárias) das mudanças de setor.
+                    Complete as mudanças de setor: data efetiva e, nas temporárias, data final,
+                    áreas e turnos de origem/destino e justificativa.
                   </span>
                 )}
               </div>
