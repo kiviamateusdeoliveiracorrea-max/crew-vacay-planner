@@ -174,16 +174,26 @@ export function autoMapear(colunas: string[], fonte: FonteKey): Mapeamento {
   const disponiveis = colunas.filter((c) => !ignoradas.has(c));
   const usadas = new Set<string>();
   const auto: Mapeamento = {};
+  const chaves = CAMPOS_POR_FONTE[fonte];
+  const aliasesDe = (key: CampoKey) =>
+    CAMPOS_DEF.find((c) => c.key === key)!.aliases.map(normaliza);
 
-  for (const key of CAMPOS_POR_FONTE[fonte]) {
-    const def = CAMPOS_DEF.find((c) => c.key === key)!;
-    const alvos = def.aliases.map(normaliza);
+  // 1ª passada: correspondência exata de cabeçalho (evita que "Turno Plan" caia em "Turno").
+  for (const key of chaves) {
+    const alvos = aliasesDe(key);
     const exato = disponiveis.find((c) => !usadas.has(c) && alvos.includes(normaliza(c)));
-    const parcial =
-      exato ??
-      disponiveis.find(
-        (c) => !usadas.has(c) && alvos.some((a) => a.length >= 4 && normaliza(c).includes(a)),
-      );
+    if (exato) {
+      auto[key] = exato;
+      usadas.add(exato);
+    }
+  }
+  // 2ª passada: correspondência parcial.
+  for (const key of chaves) {
+    if (auto[key]) continue;
+    const alvos = aliasesDe(key);
+    const parcial = disponiveis.find(
+      (c) => !usadas.has(c) && alvos.some((a) => a.length >= 4 && normaliza(c).includes(a)),
+    );
     if (parcial) {
       auto[key] = parcial;
       usadas.add(parcial);
