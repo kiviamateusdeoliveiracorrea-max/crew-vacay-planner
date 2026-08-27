@@ -779,28 +779,22 @@ function Painel() {
           <p className="text-sm text-muted-foreground">Carregando indicadores…</p>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {indicadores.map((i) => (
-                <div
-                  key={i.titulo}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setDrill(i.drill)}
-                  onKeyDown={(e) => e.key === "Enter" && setDrill(i.drill)}
-                  className="cursor-pointer rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent/40"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {i.titulo}
-                    </p>
-                    <Acoes drill={i.drill} />
-                  </div>
-                  <p className={`mt-1 text-2xl font-semibold ${i.tom ?? "text-foreground"}`}>
-                    {i.valor}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <Bloco
+              titulo="Ações necessárias"
+              descricao="Comece por aqui: itens que dependem de uma decisão sua."
+              cards={blocoAcoes}
+            />
+            <Bloco
+              titulo="Resumo do dia"
+              descricao="Como está a operação hoje."
+              cards={blocoResumo}
+            />
+            <Bloco
+              titulo="Planejamento"
+              descricao="Férias e coberturas dos próximos períodos."
+              cards={blocoPlanejamento}
+            />
+
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
