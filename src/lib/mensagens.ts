@@ -121,3 +121,14 @@ export function mensagemErro(erro: unknown, padrao = "Não foi possível conclui
 
   return { texto: padrao, detalhe: detalhe || padrao };
 }
+
+/** Mensagens de entrada e cadastro em linguagem clara. */
+export function mensagemAutenticacao(erro: unknown): string {
+  const bruto = erro instanceof Error ? erro.message : String(erro ?? "");
+  if (/invalid login credentials/i.test(bruto)) return "E-mail ou senha incorretos. Verifique e tente novamente.";
+  if (/email not confirmed/i.test(bruto)) return "Confirme seu e-mail para acessar o aplicativo.";
+  if (/user already registered/i.test(bruto)) return "Este e-mail já possui cadastro. Use a opção Entrar.";
+  if (/password.*(6|short|weak)/i.test(bruto)) return "A senha deve ter pelo menos 6 caracteres.";
+  if (/rate limit|too many/i.test(bruto)) return "Muitas tentativas em pouco tempo. Aguarde alguns instantes e tente novamente.";
+  return mensagemErro(erro, "Não foi possível entrar agora. Tente novamente.").texto;
+}
