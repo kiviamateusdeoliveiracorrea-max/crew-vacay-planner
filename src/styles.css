@@ -191,5 +191,50 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem; /* 15px — mínimo legível para informação operacional */
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Cartão padrão do design system */
+@utility surface-card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+/* Tabelas: linhas alternadas discretas + cabeçalho fixo */
+@utility table-zebra {
+  & tbody tr:nth-child(even) {
+    background-color: color-mix(in oklab, var(--color-muted) 55%, transparent);
+  }
+  & tbody tr:hover {
+    background-color: color-mix(in oklab, var(--color-accent) 70%, transparent);
+  }
+}
+
+@utility table-sticky-head {
+  & thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--color-card);
+    box-shadow: inset 0 -1px 0 var(--color-border);
   }
 }
