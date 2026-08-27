@@ -1178,7 +1178,7 @@ function ImportarPage() {
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
-        </Dialog>
+        </AlertDialog>
       </div>
     </AppShell>
   );
