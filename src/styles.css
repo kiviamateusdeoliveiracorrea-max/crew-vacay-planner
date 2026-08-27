@@ -48,11 +48,23 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-critical: var(--critical);
   --color-critical-foreground: var(--critical-foreground);
+  --color-high: var(--high);
+  --color-high-foreground: var(--high-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --color-border: var(--border);
 
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-ring-offset-background: var(--background);
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Archivo", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --shadow-card: 0 1px 2px oklch(0.2 0.02 255 / 6%), 0 8px 24px -16px oklch(0.2 0.02 255 / 22%);
+  --shadow-header: 0 1px 0 var(--border), 0 8px 24px -20px oklch(0.2 0.02 255 / 35%);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -69,45 +81,56 @@
 }
 
 :root {
-  --radius: 0.5rem;
-  --background: oklch(0.975 0.005 250);
-  --foreground: oklch(0.22 0.03 255);
+  --radius: 0.625rem;
+  /* Fundo principal e cards */
+  --background: oklch(0.976 0.003 250);
+  --foreground: oklch(0.26 0.012 255);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.22 0.03 255);
+  --card-foreground: oklch(0.26 0.012 255);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.22 0.03 255);
-  --primary: oklch(0.42 0.09 245);
-  --primary-foreground: oklch(0.99 0.005 250);
-  --secondary: oklch(0.94 0.012 250);
-  --secondary-foreground: oklch(0.3 0.04 255);
-  --muted: oklch(0.945 0.008 250);
-  --muted-foreground: oklch(0.52 0.03 255);
-  --accent: oklch(0.78 0.16 68);
-  --accent-foreground: oklch(0.24 0.05 60);
+  --popover-foreground: oklch(0.26 0.012 255);
+  /* Institucional Intralog: grafite corporativo + vermelho da marca */
+  --primary: oklch(0.36 0.012 255);
+  --primary-foreground: oklch(0.99 0.002 250);
+  --brand: oklch(0.55 0.21 27);
+  --brand-foreground: oklch(0.99 0.002 250);
+  --secondary: oklch(0.945 0.005 250);
+  --secondary-foreground: oklch(0.32 0.012 255);
+  --muted: oklch(0.955 0.004 250);
+  --muted-foreground: oklch(0.53 0.012 255);
+  --accent: oklch(0.94 0.01 250);
+  --accent-foreground: oklch(0.3 0.012 255);
   --destructive: oklch(0.55 0.21 27);
-  --destructive-foreground: oklch(0.99 0.005 250);
+  --destructive-foreground: oklch(0.99 0.002 250);
+  /* Semânticas de alerta — não alterar significado */
   --success: oklch(0.62 0.14 155);
   --success-foreground: oklch(0.99 0.005 250);
   --warning: oklch(0.8 0.16 78);
   --warning-foreground: oklch(0.28 0.06 60);
+  --high: oklch(0.68 0.18 48);
+  --high-foreground: oklch(0.24 0.05 50);
   --critical: oklch(0.55 0.21 27);
   --critical-foreground: oklch(0.99 0.005 250);
-  --border: oklch(0.9 0.012 250);
-  --input: oklch(0.9 0.012 250);
-  --ring: oklch(0.42 0.09 245);
-  --chart-1: oklch(0.42 0.09 245);
+  --info: oklch(0.55 0.15 250);
+  --info-foreground: oklch(0.99 0.005 250);
+  --neutral: oklch(0.72 0.008 255);
+  --neutral-foreground: oklch(0.28 0.012 255);
+  --border: oklch(0.905 0.006 250);
+  --input: oklch(0.895 0.006 250);
+  --ring: oklch(0.55 0.21 27);
+  --chart-1: oklch(0.36 0.012 255);
   --chart-2: oklch(0.62 0.14 155);
-  --chart-3: oklch(0.78 0.16 68);
+  --chart-3: oklch(0.8 0.16 78);
   --chart-4: oklch(0.55 0.21 27);
-  --chart-5: oklch(0.52 0.03 255);
-  --sidebar: oklch(0.28 0.045 255);
-  --sidebar-foreground: oklch(0.96 0.005 250);
-  --sidebar-primary: oklch(0.78 0.16 68);
-  --sidebar-primary-foreground: oklch(0.24 0.05 60);
-  --sidebar-accent: oklch(0.34 0.05 255);
-  --sidebar-accent-foreground: oklch(0.96 0.005 250);
-  --sidebar-border: oklch(0.38 0.04 255);
-  --sidebar-ring: oklch(0.78 0.16 68);
+  --chart-5: oklch(0.55 0.15 250);
+  --sidebar: oklch(0.28 0.012 255);
+  --sidebar-foreground: oklch(0.96 0.003 250);
+  --sidebar-primary: oklch(0.55 0.21 27);
+  --sidebar-primary-foreground: oklch(0.99 0.002 250);
+  --sidebar-accent: oklch(0.34 0.012 255);
+  --sidebar-accent-foreground: oklch(0.96 0.003 250);
+  --sidebar-border: oklch(0.38 0.01 255);
+  --sidebar-ring: oklch(0.55 0.21 27);
 }
 
 
@@ -128,9 +151,23 @@
   --accent-foreground: oklch(0.984 0.003 247.858);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.984 0.003 247.858);
+  --brand: oklch(0.66 0.2 27);
+  --brand-foreground: oklch(0.99 0.002 250);
+  --success: oklch(0.7 0.15 155);
+  --success-foreground: oklch(0.16 0.03 160);
+  --warning: oklch(0.84 0.16 82);
+  --warning-foreground: oklch(0.22 0.05 60);
+  --high: oklch(0.74 0.17 50);
+  --high-foreground: oklch(0.2 0.05 50);
+  --critical: oklch(0.68 0.2 27);
+  --critical-foreground: oklch(0.99 0.005 250);
+  --info: oklch(0.68 0.14 250);
+  --info-foreground: oklch(0.16 0.04 255);
+  --neutral: oklch(0.45 0.02 255);
+  --neutral-foreground: oklch(0.95 0.005 250);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
+  --ring: oklch(0.66 0.2 27);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
@@ -154,5 +191,50 @@
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem; /* 15px — mínimo legível para informação operacional */
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Cartão padrão do design system */
+@utility surface-card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+/* Tabelas: linhas alternadas discretas + cabeçalho fixo */
+@utility table-zebra {
+  & tbody tr:nth-child(even) {
+    background-color: color-mix(in oklab, var(--color-muted) 55%, transparent);
+  }
+  & tbody tr:hover {
+    background-color: color-mix(in oklab, var(--color-accent) 70%, transparent);
+  }
+}
+
+@utility table-sticky-head {
+  & thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--color-card);
+    box-shadow: inset 0 -1px 0 var(--color-border);
   }
 }
