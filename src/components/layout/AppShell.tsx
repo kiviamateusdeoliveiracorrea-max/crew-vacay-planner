@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BootstrapAdmin } from "@/components/layout/BootstrapAdmin";
 import { SolicitarAcesso } from "@/components/layout/SolicitarAcesso";
+import intralogLogoAsset from "@/assets/intralog-logo.png.asset.json";
 
 
 const LINKS = [
