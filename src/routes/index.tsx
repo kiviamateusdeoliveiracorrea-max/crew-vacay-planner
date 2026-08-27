@@ -46,8 +46,9 @@ import {
   type MovementFull,
   type VacationFull,
 } from "@/hooks/useSistema";
+import { useResumoDoDia, useLotesPendentes } from "@/hooks/usePainelInicio";
 import { ehCritico, severidadeMax } from "@/lib/conflitos";
-import { humaniza, mesDe, sobrepoe, SEVERIDADE_PESO, type Severidade } from "@/lib/sistema";
+import { fmtDataHora, humaniza, mesDe, sobrepoe, SEVERIDADE_PESO, type Severidade } from "@/lib/sistema";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -159,6 +160,84 @@ function Painel() {
   const previstas = movimentacoes.filter(
     (m) => m.status !== "CANCELADA" && m.status !== "REJEITADA",
   );
+
+  /* ------------------------------------------------- resumo do dia e ações */
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const emSeteDias = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+  const resumoDia = useResumoDoDia(hoje);
+  const lotes = useLotesPendentes();
+
+  const registrosHoje = resumoDia.data?.registros ?? [];
+  const presentesHoje = registrosHoje.filter((r) => r.attendance_status === "PRESENTE");
+  const ausentesHoje = registrosHoje.filter((r) =>
+    ["FALTA", "FALTA_JUSTIFICADA", "ATESTADO"].includes(r.attendance_status),
+  );
+  const chamadasNaoFechadas = (resumoDia.data?.dias ?? []).filter(
+    (d) => d.status !== "FECHADA" && d.status !== "CANCELADA",
+  );
+  const chamadasPendentesHoje = (resumoDia.data?.diasDoDia ?? []).filter(
+    (d) => d.status !== "FECHADA" && d.status !== "CANCELADA",
+  );
+
+  const feriasHoje = ativas.filter((v) => v.inicio <= hoje && hoje <= v.fim);
+  const afastados = useMemo(() => {
+    const idsArea = new Set(areasVisiveis.map((a) => a.id));
+    return employees.filter(
+      (e) =>
+        e.status === "AFASTADO" &&
+        idsArea.has(e.area_id ?? "") &&
+        (areaId === TODOS || e.area_id === areaId) &&
+        (shiftId === TODOS || e.shift_id === shiftId),
+    );
+  }, [employees, areasVisiveis, areaId, shiftId]);
+
+  const temporariasVigentes = previstas.filter(
+    (m) => m.temporaria && m.data_efetiva <= hoje && (!m.data_fim || m.data_fim >= hoje),
+  );
+  const temporariasEncerrando = temporariasVigentes.filter(
+    (m) => !!m.data_fim && m.data_fim <= emSeteDias,
+  );
+  const chaveSemSubstituto = ativas.filter(
+    (v) =>
+      funcoes.find((f) => f.id === v.employee?.function_id)?.funcao_chave &&
+      !v.substituto_employee_id &&
+      !v.substituto_nome,
+  );
+
+  const tab = (nome: string, colunas: string[], linhas: (string | number)[][]): Tabela => ({
+    nome,
+    colunas,
+    linhas,
+  });
+
+  const tabRegistros = (nome: string, itens: typeof registrosHoje) =>
+    tab(
+      nome,
+      ["RE", "Colaborador", "Função", "Situação", "Motivo", "Observação"],
+      itens.map((r) => [
+        r.employee_re ?? "—",
+        r.employee_name_snapshot ?? "—",
+        r.function_snapshot ?? "—",
+        humaniza(r.attendance_status),
+        r.absence_reason_id ?? "—",
+        r.notes ?? "—",
+      ]),
+    );
+
+  const tabChamadas = (nome: string, itens: typeof chamadasNaoFechadas) =>
+    tab(
+      nome,
+      ["Data", "Área", "Turno", "Situação", "Observação"],
+      itens.map((d) => [
+        d.attendance_date,
+        nomeArea(d.area_id),
+        nomeTurno(d.shift_id),
+        humaniza(d.status),
+        d.notes ?? "—",
+      ]),
+    );
+
 
   const porMes = useMemo(() => {
     const mapa = new Map<string, VacationFull[]>();
@@ -324,16 +403,115 @@ function Painel() {
     }
   }
 
-  const indicadores: { titulo: string; valor: number; tom?: string; drill: NonNullable<Drilldown> }[] = [
+  type CardIndicador = {
+    titulo: string;
+    valor: number;
+    ajuda: string;
+    tom?: string | undefined;
+    drill: NonNullable<Drilldown>;
+  };
+
+  const blocoResumo: CardIndicador[] = [
     {
-      titulo: "Férias no filtro",
+      titulo: "Colaboradores previstos",
+      valor: registrosHoje.length,
+      ajuda: "Escalados nas chamadas de hoje",
+      drill: {
+        titulo: "Colaboradores previstos hoje",
+        indicador: "Colaboradores previstos",
+        tipo: "tabela",
+        tabela: tabRegistros("Previstos hoje", registrosHoje),
+      },
+    },
+    {
+      titulo: "Presentes",
+      valor: presentesHoje.length,
+      ajuda: "Confirmados como presentes",
+      tom: "text-success",
+      drill: {
+        titulo: "Presentes hoje",
+        indicador: "Presentes",
+        tipo: "tabela",
+        tabela: tabRegistros("Presentes hoje", presentesHoje),
+      },
+    },
+    {
+      titulo: "Ausentes",
+      valor: ausentesHoje.length,
+      ajuda: "Faltas, atestados e justificativas",
+      tom: ausentesHoje.length > 0 ? "text-high" : undefined,
+      drill: {
+        titulo: "Ausências de hoje",
+        indicador: "Ausentes",
+        tipo: "tabela",
+        tabela: tabRegistros("Ausentes hoje", ausentesHoje),
+      },
+    },
+    {
+      titulo: "Em férias",
+      valor: feriasHoje.length,
+      ajuda: "Colaboradores em gozo de férias hoje",
+      drill: {
+        titulo: "Em férias hoje",
+        indicador: "Em férias",
+        tipo: "ferias",
+        itens: feriasHoje,
+        tabela: tFerias(feriasHoje),
+      },
+    },
+    {
+      titulo: "Afastados",
+      valor: afastados.length,
+      ajuda: "Cadastro com afastamento vigente",
+      drill: {
+        titulo: "Colaboradores afastados",
+        indicador: "Afastados",
+        tipo: "tabela",
+        tabela: tab(
+          "Afastados",
+          ["RE", "Colaborador", "Área", "Turno", "Função"],
+          afastados.map((e) => [
+            e.re,
+            e.nome,
+            nomeArea(e.area_id),
+            nomeTurno(e.shift_id),
+            nomeFuncao(e.function_id),
+          ]),
+        ),
+      },
+    },
+    {
+      titulo: "Chamadas pendentes",
+      valor: chamadasPendentesHoje.length,
+      ajuda: "Chamadas de hoje ainda sem fechamento",
+      tom: chamadasPendentesHoje.length > 0 ? "text-warning" : undefined,
+      drill: {
+        titulo: "Chamadas de hoje sem fechamento",
+        indicador: "Chamadas pendentes",
+        tipo: "tabela",
+        tabela: tabChamadas("Chamadas pendentes", chamadasPendentesHoje),
+      },
+    },
+  ];
+
+  const blocoPlanejamento: CardIndicador[] = [
+    {
+      titulo: "Férias programadas",
       valor: ativas.length,
-      drill: { titulo: "Férias no filtro", indicador: "Férias no filtro", tipo: "ferias", itens: ativas, tabela: tFerias(ativas) },
+      ajuda: "Programações válidas nos filtros atuais",
+      drill: {
+        titulo: "Férias programadas",
+        indicador: "Férias programadas",
+        tipo: "ferias",
+        itens: ativas,
+        tabela: tFerias(ativas),
+      },
     },
     {
       titulo: "Férias críticas",
       valor: criticas.length,
-      tom: "text-destructive",
+      ajuda: "Com conflito crítico ou bloqueio",
+      tom: criticas.length > 0 ? "text-critical" : undefined,
       drill: {
         titulo: "Férias com conflito crítico ou bloqueio",
         indicador: "Férias críticas",
@@ -343,32 +521,10 @@ function Painel() {
       },
     },
     {
-      titulo: "Funções-chave impactadas",
-      valor: chaveImpactadas.length,
-      tom: "text-amber-500",
-      drill: {
-        titulo: "Férias de funções-chave",
-        indicador: "Funções-chave impactadas",
-        tipo: "ferias",
-        itens: chaveImpactadas,
-        tabela: tFerias(chaveImpactadas),
-      },
-    },
-    {
-      titulo: "Férias sem substituto",
-      valor: semSubstituto.length,
-      drill: {
-        titulo: "Férias sem substituto indicado",
-        indicador: "Férias sem substituto",
-        tipo: "ferias",
-        itens: semSubstituto,
-        tabela: tFerias(semSubstituto),
-      },
-    },
-    {
       titulo: "Férias a vencer",
       valor: aVencer.linhas.length,
-      tom: "text-amber-500",
+      ajuda: "Saldo próximo do limite legal",
+      tom: aVencer.linhas.length > 0 ? "text-high" : undefined,
       drill: {
         titulo: "Férias a vencer",
         indicador: "Férias a vencer",
@@ -377,40 +533,108 @@ function Painel() {
       },
     },
     {
-      titulo: "Movimentações previstas",
-      valor: previstas.length,
+      titulo: "Funções-chave sem substituto",
+      valor: chaveSemSubstituto.length,
+      ajuda: "Cobertura ainda não indicada",
+      tom: chaveSemSubstituto.length > 0 ? "text-high" : undefined,
       drill: {
-        titulo: "Movimentações previstas",
-        indicador: "Movimentações previstas",
-        tipo: "movimentacoes",
-        itens: previstas,
-        tabela: tMov(previstas),
-      },
-    },
-    {
-      titulo: "Movimentação durante férias",
-      valor: movDuranteFerias.length,
-      tom: "text-destructive",
-      drill: {
-        titulo: "Férias com movimentação no período",
-        indicador: "Movimentação durante férias",
+        titulo: "Funções-chave sem substituto indicado",
+        indicador: "Funções-chave sem substituto",
         tipo: "ferias",
-        itens: movDuranteFerias,
-        tabela: tFerias(movDuranteFerias),
+        itens: chaveSemSubstituto,
+        tabela: tFerias(chaveSemSubstituto),
       },
     },
     {
-      titulo: "Pendências de aprovação",
+      titulo: "Movimentações temporárias",
+      valor: temporariasVigentes.length,
+      ajuda: "Empréstimos e coberturas vigentes",
+      drill: {
+        titulo: "Movimentações temporárias vigentes",
+        indicador: "Movimentações temporárias",
+        tipo: "movimentacoes",
+        itens: temporariasVigentes,
+        tabela: tMov(temporariasVigentes),
+      },
+    },
+  ];
+
+  const blocoAcoes: CardIndicador[] = [
+    {
+      titulo: "Aprovações pendentes",
       valor: pendencias.length,
+      ajuda: "Movimentações aguardando decisão",
+      tom: pendencias.length > 0 ? "text-warning" : undefined,
       drill: {
         titulo: "Movimentações pendentes de aprovação",
-        indicador: "Pendências de aprovação",
+        indicador: "Aprovações pendentes",
         tipo: "movimentacoes",
         itens: pendencias,
         tabela: tMov(pendencias),
       },
     },
+    {
+      titulo: "Conflitos críticos",
+      valor: criticas.length,
+      ajuda: "Precisam de tratativa da liderança",
+      tom: criticas.length > 0 ? "text-critical" : undefined,
+      drill: {
+        titulo: "Conflitos críticos de férias",
+        indicador: "Conflitos críticos",
+        tipo: "ferias",
+        itens: criticas,
+        tabela: tFerias(criticas),
+      },
+    },
+    {
+      titulo: "Bases aguardando validação",
+      valor: (lotes.data ?? []).length,
+      ajuda: "Importações não processadas",
+      tom: (lotes.data ?? []).length > 0 ? "text-warning" : undefined,
+      drill: {
+        titulo: "Lotes de importação aguardando validação",
+        indicador: "Bases aguardando validação",
+        tipo: "tabela",
+        tabela: tab(
+          "Lotes pendentes",
+          ["Arquivo", "Fonte", "Situação", "Linhas", "Criado em"],
+          (lotes.data ?? []).map((l) => [
+            l.arquivo_nome,
+            humaniza(l.fonte),
+            humaniza(l.status),
+            l.total_linhas,
+            fmtDataHora(l.created_at),
+          ]),
+        ),
+      },
+    },
+    {
+      titulo: "Chamadas não fechadas",
+      valor: chamadasNaoFechadas.length,
+      ajuda: "Últimos 30 dias sem fechamento",
+      tom: chamadasNaoFechadas.length > 0 ? "text-critical" : undefined,
+      drill: {
+        titulo: "Chamadas sem fechamento",
+        indicador: "Chamadas não fechadas",
+        tipo: "tabela",
+        tabela: tabChamadas("Chamadas não fechadas", chamadasNaoFechadas),
+      },
+    },
+    {
+      titulo: "Movimentações encerrando",
+      valor: temporariasEncerrando.length,
+      ajuda: "Temporárias que terminam em até 7 dias",
+      tom: temporariasEncerrando.length > 0 ? "text-high" : undefined,
+      drill: {
+        titulo: "Movimentações temporárias próximas do encerramento",
+        indicador: "Movimentações encerrando",
+        tipo: "movimentacoes",
+        itens: temporariasEncerrando,
+        tabela: tMov(temporariasEncerrando),
+      },
+    },
   ];
+
 
   const Acoes = ({ drill }: { drill: NonNullable<Drilldown> }) => (
     <DropdownMenu>
@@ -438,6 +662,45 @@ function Painel() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+
+  const Bloco = ({
+    titulo,
+    descricao,
+    cards,
+  }: {
+    titulo: string;
+    descricao: string;
+    cards: CardIndicador[];
+  }) => (
+    <section aria-label={titulo} className="space-y-3">
+      <div>
+        <h2 className="text-base font-semibold tracking-tight text-foreground">{titulo}</h2>
+        <p className="text-sm text-muted-foreground">{descricao}</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {cards.map((c) => (
+          <div
+            key={c.titulo}
+            role="button"
+            tabIndex={0}
+            aria-label={`${c.titulo}: ${c.valor}. Abrir registros`}
+            onClick={() => setDrill(c.drill)}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setDrill(c.drill)}
+            className="cursor-pointer rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-medium text-foreground">{c.titulo}</p>
+              <Acoes drill={c.drill} />
+            </div>
+            <p className={`mt-1 text-3xl font-semibold ${c.tom ?? "text-foreground"}`}>{c.valor}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{c.ajuda}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+
+
 
   const drillMes = (m: string, itens: VacationFull[]): NonNullable<Drilldown> => ({
     titulo: `Férias iniciadas em ${m}`,
@@ -555,28 +818,22 @@ function Painel() {
           <p className="text-sm text-muted-foreground">Carregando indicadores…</p>
         ) : (
           <>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {indicadores.map((i) => (
-                <div
-                  key={i.titulo}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setDrill(i.drill)}
-                  onKeyDown={(e) => e.key === "Enter" && setDrill(i.drill)}
-                  className="cursor-pointer rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent/40"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {i.titulo}
-                    </p>
-                    <Acoes drill={i.drill} />
-                  </div>
-                  <p className={`mt-1 text-2xl font-semibold ${i.tom ?? "text-foreground"}`}>
-                    {i.valor}
-                  </p>
-                </div>
-              ))}
-            </div>
+            <Bloco
+              titulo="Ações necessárias"
+              descricao="Comece por aqui: itens que dependem de uma decisão sua."
+              cards={blocoAcoes}
+            />
+            <Bloco
+              titulo="Resumo do dia"
+              descricao="Como está a operação hoje."
+              cards={blocoResumo}
+            />
+            <Bloco
+              titulo="Planejamento"
+              descricao="Férias e coberturas dos próximos períodos."
+              cards={blocoPlanejamento}
+            />
+
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
