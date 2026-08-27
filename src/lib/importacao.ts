@@ -345,7 +345,7 @@ export function classificar(
     let classificacao: ClassificacaoImport;
     if (ehVaga) classificacao = "VAGA_ABERTA";
     else if (!chave) {
-      if (!erros.length) erros.push("Linha sem RE / matrícula");
+      erros.push("Linha sem RE / matrícula — identificação obrigatória");
       classificacao = "DADO_INVALIDO";
     } else if (erros.length) classificacao = "DADO_INVALIDO";
     else if (duplicado) classificacao = "DUPLICIDADE";
