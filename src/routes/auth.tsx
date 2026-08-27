@@ -74,10 +74,17 @@ function AuthPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-secondary px-4">
       <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl">Controle de Férias</CardTitle>
+        <CardHeader className="text-center">
+          <div className="mb-2 flex justify-center">
+            <img
+              src={intralogLogoAsset.url}
+              alt="Intralog"
+              className="h-10 w-auto object-contain"
+            />
+          </div>
+          <CardTitle className="text-2xl">Gestão de Férias</CardTitle>
           <CardDescription>
-            Acesso compartilhado da operação. Entre para lançar e conferir as férias por área.
+            Acesso corporativo da Intralog. Entre para lançar e conferir férias, presença e movimentações.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
