@@ -1,6 +1,6 @@
 import type { Enums, Tables } from "@/integrations/supabase/types";
 import type { Employee, Movement, Vacation } from "@/lib/sistema";
-import { lotacaoVigente } from "@/lib/movimentacao";
+import { lotacaoDefinitiva, lotacaoVigente } from "@/lib/movimentacao";
 
 export type ChamadaDia = Tables<"attendance_days">;
 export type ChamadaRegistro = Tables<"attendance_records">;
@@ -81,10 +81,30 @@ export function statusClasse(s: StatusPresenca) {
   }
 }
 
+export const MARCA_DIVERGENCIA = "DIVERGÊNCIA — REVISÃO NECESSÁRIA";
+
+export type OrigemDivergencia = {
+  entidade: "vacations" | "employee_movements" | "employees";
+  id: string;
+  rota: string;
+  rotulo: string;
+};
+
+export type Divergencia = {
+  regra: string;
+  mensagem: string;
+  origens: OrigemDivergencia[];
+};
+
+export type FeriasChamada = Pick<
+  Vacation,
+  "id" | "employee_id" | "inicio" | "fim" | "status"
+>;
+
 export type PrevistoBase = {
   employees: Employee[];
   movimentacoes: Movement[];
-  ferias: Pick<Vacation, "employee_id" | "inicio" | "fim" | "status">[];
+  ferias: FeriasChamada[];
   funcoes: { id: string; nome: string }[];
 };
 
@@ -99,13 +119,40 @@ export type Previsto = {
   effective_shift_id: string | null;
   attendance_status: StatusPresenca;
   notes: string | null;
+  temporaria: boolean;
   avisos: string[];
+  divergencias: Divergencia[];
 };
 
+const origemFerias = (v: FeriasChamada): OrigemDivergencia => ({
+  entidade: "vacations",
+  id: v.id,
+  rota: `/ferias?registro=${v.id}`,
+  rotulo: `Férias ${v.inicio} a ${v.fim}`,
+});
+
+const origemMovimentacao = (m: Movement): OrigemDivergencia => ({
+  entidade: "employee_movements",
+  id: m.id,
+  rota: `/movimentacoes?registro=${m.id}`,
+  rotulo: `Movimentação ${m.tipo} desde ${m.data_efetiva}`,
+});
+
+const origemColaborador = (e: Employee): OrigemDivergencia => ({
+  entidade: "employees",
+  id: e.id,
+  rota: `/?re=${e.re}`,
+  rotulo: `Cadastro do colaborador ${e.re}`,
+});
+
 /**
- * Monta a lista prevista da chamada para uma data/área/turno considerando
- * movimentações definitivas e temporárias vigentes, férias e afastamentos.
- * Desligados nunca entram.
+ * Monta a lista prevista da chamada para uma data/área/turno.
+ *
+ * Regras: férias vigentes (`inicio <= data` e retorno `fim + 1 > data`, ignorando
+ * canceladas), movimentação definitiva (carrega no destino, preserva a área
+ * planejada), movimentação temporária (destino marcado como temporário e origem
+ * como APOIO_OUTRA_AREA), afastamento vigente e exclusão de desligados.
+ * Situações ambíguas não recebem status automático: viram divergência.
  */
 export function montarPrevistos(
   base: PrevistoBase,
@@ -116,13 +163,23 @@ export function montarPrevistos(
   const nomeFuncao = (id: string | null) =>
     id ? (base.funcoes.find((f) => f.id === id)?.nome ?? null) : null;
 
-  const emFerias = (employeeId: string) =>
-    base.ferias.some(
+  const feriasVigentes = (employeeId: string) =>
+    base.ferias.filter(
       (v) =>
         v.employee_id === employeeId &&
         v.status !== "CANCELADA" &&
         v.inicio <= data &&
         v.fim >= data,
+    );
+
+  const temporariasVigentes = (employeeId: string) =>
+    base.movimentacoes.filter(
+      (m) =>
+        m.employee_id === employeeId &&
+        m.status === "APROVADA" &&
+        m.temporaria &&
+        m.data_efetiva <= data &&
+        (m.data_fim ?? data) >= data,
     );
 
   const linhas: Previsto[] = [];
@@ -131,40 +188,82 @@ export function montarPrevistos(
     if (e.status === "DESLIGADO") continue;
     if (e.data_desligamento && e.data_desligamento <= data) continue;
 
-    const lot = lotacaoVigente(base.movimentacoes, e, data);
-    const efetivaAqui = lot.areaId === areaId;
-    const planejadaAqui = e.area_id === areaId;
-    if (!efetivaAqui && !planejadaAqui) continue;
+    const definitiva = lotacaoDefinitiva(base.movimentacoes, e, data);
+    const vigente = lotacaoVigente(base.movimentacoes, e, data);
 
-    const turnoOk =
-      !shiftId ||
-      (efetivaAqui ? lot.shiftId === shiftId : e.shift_id === shiftId) ||
-      (!lot.shiftId && !e.shift_id);
+    const efetivaAqui = vigente.areaId === areaId;
+    const origemAqui = definitiva.areaId === areaId && !efetivaAqui;
+    if (!efetivaAqui && !origemAqui) continue;
+
+    const turnoRef = efetivaAqui ? vigente.shiftId : definitiva.shiftId;
+    const turnoOk = !shiftId || turnoRef === shiftId || (!turnoRef && !e.shift_id);
     if (!turnoOk) continue;
 
     const avisos: string[] = [];
+    const divergencias: Divergencia[] = [];
     if (!e.area_id) avisos.push("Colaborador sem área cadastrada");
     if (!e.shift_id) avisos.push("Colaborador sem turno cadastrado");
+
+    const ferias = feriasVigentes(e.id);
+    const temporarias = temporariasVigentes(e.id);
+    const emFerias = ferias.length > 0;
+    const afastado = e.status === "AFASTADO";
 
     let status: StatusPresenca = "PENDENTE";
     let notes: string | null = null;
 
-    if (!efetivaAqui && planejadaAqui) {
-      status = "NAO_PREVISTO";
-      notes = "Cedido temporariamente para outra área";
-      avisos.push("Colaborador enviado para outra área na data");
-    } else if (efetivaAqui && !planejadaAqui) {
-      notes = "Recebido temporariamente de outra área";
-    } else if (lot.temporaria) {
-      notes = "Movimentação temporária vigente";
+    if (origemAqui) {
+      status = "APOIO_OUTRA_AREA";
+      notes = "Cedido temporariamente para outra área (não conta como falta)";
+      avisos.push("Colaborador atuando em outra área na data");
+    } else if (vigente.temporaria) {
+      notes = "Temporário — movimentação vigente na data";
+    } else if (definitiva.areaId === areaId && e.area_id && e.area_id !== areaId) {
+      notes = "Transferência definitiva vigente para esta área";
     }
 
-    if (emFerias(e.id)) {
+    if (emFerias) {
       status = "FERIAS";
       notes = "Férias vigentes na data";
-    } else if (e.status === "AFASTADO") {
+    } else if (afastado) {
       status = "AFASTADO";
       notes = "Afastamento vigente";
+    }
+
+    // Divergências: nunca escolher um status silenciosamente.
+    if (emFerias && afastado) {
+      divergencias.push({
+        regra: "FERIAS_E_AFASTAMENTO",
+        mensagem: "Colaborador com férias vigentes e afastamento simultâneos.",
+        origens: [...ferias.map(origemFerias), origemColaborador(e)],
+      });
+    }
+    if (emFerias && temporarias.length) {
+      divergencias.push({
+        regra: "FERIAS_E_MOVIMENTACAO",
+        mensagem: "Movimentação vigente durante o período de férias.",
+        origens: [...ferias.map(origemFerias), ...temporarias.map(origemMovimentacao)],
+      });
+    }
+    if (e.area_id && definitiva.areaId && e.area_id !== definitiva.areaId) {
+      divergencias.push({
+        regra: "DOIS_VINCULOS_DE_AREA",
+        mensagem: "Área do cadastro diferente da área definitiva das movimentações.",
+        origens: [origemColaborador(e)],
+      });
+    }
+    if (temporarias.length > 1) {
+      divergencias.push({
+        regra: "MOVIMENTACOES_SOBREPOSTAS",
+        mensagem: "Mais de uma movimentação temporária vigente na mesma data.",
+        origens: temporarias.map(origemMovimentacao),
+      });
+    }
+
+    if (divergencias.length) {
+      status = "PENDENTE";
+      notes = `${MARCA_DIVERGENCIA}: ${divergencias.map((d) => d.mensagem).join(" ")}`;
+      avisos.push(MARCA_DIVERGENCIA);
     }
 
     linhas.push({
@@ -172,13 +271,15 @@ export function montarPrevistos(
       employee_re: e.re,
       employee_name_snapshot: e.nome,
       function_snapshot: nomeFuncao(e.function_id),
-      planned_area_id: e.area_id,
-      effective_area_id: lot.areaId,
-      planned_shift_id: e.shift_id,
-      effective_shift_id: lot.shiftId,
+      planned_area_id: definitiva.areaId,
+      effective_area_id: vigente.areaId,
+      planned_shift_id: definitiva.shiftId,
+      effective_shift_id: vigente.shiftId,
       attendance_status: status,
       notes,
+      temporaria: vigente.temporaria,
       avisos,
+      divergencias,
     });
   }
 
@@ -186,6 +287,7 @@ export function montarPrevistos(
     a.employee_name_snapshot.localeCompare(b.employee_name_snapshot, "pt-BR"),
   );
 }
+
 
 export type Resumo = {
   previsto: number;
@@ -268,6 +370,12 @@ export function bloqueiosFechamento(
   if (divergencias.length)
     erros.push(
       `${divergencias.length} divergência(s) não tratada(s): informe horário de chegada/saída ou observação`,
+    );
+
+  const pendentesDivergentes = registros.filter((r) => r.notes?.includes(MARCA_DIVERGENCIA));
+  if (pendentesDivergentes.length)
+    erros.push(
+      `${pendentesDivergentes.length} registro(s) com "${MARCA_DIVERGENCIA}": trate a divergência antes de fechar`,
     );
 
   return erros;

@@ -38,6 +38,7 @@ import {
 import {
   ACOES_RAPIDAS,
   bloqueiosFechamento,
+  MARCA_DIVERGENCIA,
   montarPrevistos,
   resumir,
   statusClasse,
@@ -102,6 +103,13 @@ function ChamadaPage() {
   const [justificativa, setJustificativa] = useState("");
   const [historicoDe, setHistoricoDe] = useState<ChamadaRegistro | null>(null);
   const [correcaoDe, setCorrecaoDe] = useState<ChamadaRegistro | null>(null);
+  const [divergenciaDe, setDivergenciaDe] = useState<{
+    registro: ChamadaRegistro;
+    status: StatusPresenca;
+    motivo?: string | undefined;
+  } | null>(null);
+  const [tratativa, setTratativa] = useState("");
+
 
   const areas = useMemo(
     () =>
@@ -145,9 +153,19 @@ function ChamadaPage() {
   const nomeMotivo = (id: string | null) =>
     motivos.data?.find((m) => m.id === id)?.name ?? "—";
 
+  const protegido = (r: ChamadaRegistro) =>
+    r.attendance_status === "AFASTADO" ||
+    r.attendance_status === "FERIAS" ||
+    !!r.notes?.includes(MARCA_DIVERGENCIA);
+
   async function aplicarAcao(r: ChamadaRegistro, status: StatusPresenca, motivoCode?: string) {
     if (fechada) {
       toast.error("Chamada fechada. Use a correção com justificativa.");
+      return;
+    }
+    if (protegido(r) && status !== r.attendance_status) {
+      setDivergenciaDe({ registro: r, status, motivo: motivoCode });
+      setTratativa("");
       return;
     }
     await atualizar.mutateAsync({
@@ -160,6 +178,7 @@ function ChamadaPage() {
       },
     });
   }
+
 
   return (
     <AppShell>
@@ -254,6 +273,34 @@ function ChamadaPage() {
                   .map((p) => (
                     <div key={p.employee_id}>
                       {p.employee_re} — {p.employee_name_snapshot}: {p.avisos.join("; ")}
+                    </div>
+                  ))}
+              </div>
+            )}
+            {areaId && previstos.some((p) => p.divergencias.length) && (
+              <div className="sm:col-span-2 lg:col-span-5 space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                <div className="font-semibold">{MARCA_DIVERGENCIA}</div>
+                {previstos
+                  .filter((p) => p.divergencias.length)
+                  .map((p) => (
+                    <div key={p.employee_id}>
+                      <div className="font-medium">
+                        {p.employee_re} — {p.employee_name_snapshot}
+                      </div>
+                      {p.divergencias.map((d) => (
+                        <div key={d.regra} className="pl-2">
+                          • {d.mensagem}{" "}
+                          {d.origens.map((o) => (
+                            <a
+                              key={o.id + d.regra}
+                              href={o.rota}
+                              className="underline underline-offset-2"
+                            >
+                              [{o.rotulo}]
+                            </a>
+                          ))}
+                        </div>
+                      ))}
                     </div>
                   ))}
               </div>
@@ -397,9 +444,24 @@ function ChamadaPage() {
                             }
                           />
                         </Td>
-                        <Td className="max-w-[180px] text-xs">{r.notes ?? "—"}</Td>
+                        <Td className="max-w-[180px] text-xs">
+                          {r.notes?.includes(MARCA_DIVERGENCIA) ? (
+                            <span className="font-medium text-destructive">{r.notes}</span>
+                          ) : (
+                            (r.notes ?? "—")
+                          )}
+                        </Td>
                         <Td>
                           <div className="flex flex-wrap gap-1">
+                            {!fechada && r.attendance_status !== "PRESENTE" && (
+                              <button
+                                title="Presente"
+                                onClick={() => void aplicarAcao(r, "PRESENTE")}
+                                className="rounded border border-emerald-500/40 px-1.5 py-0.5 text-[10px] text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400"
+                              >
+                                Presente
+                              </button>
+                            )}
                             {!fechada &&
                               ACOES_RAPIDAS.map((a) => (
                                 <button
@@ -526,6 +588,54 @@ function ChamadaPage() {
               }}
             >
               Confirmar fechamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Tratamento de divergência */}
+      <Dialog open={!!divergenciaDe} onOpenChange={(o) => !o && setDivergenciaDe(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tratar divergência</DialogTitle>
+            <DialogDescription>
+              {divergenciaDe
+                ? `${divergenciaDe.registro.employee_re} — ${divergenciaDe.registro.employee_name_snapshot}: alterar de ${
+                    STATUS_PRESENCA_LABEL[divergenciaDe.registro.attendance_status]
+                  } para ${STATUS_PRESENCA_LABEL[divergenciaDe.status]}. A chamada não cancela férias, não altera movimentações nem o vínculo do colaborador — corrija o registro de origem quando necessário.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Descreva o tratamento da divergência (mínimo 10 caracteres)"
+            value={tratativa}
+            onChange={(e) => setTratativa(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDivergenciaDe(null)}>
+              Cancelar
+            </Button>
+            <Button
+              disabled={tratativa.trim().length < 10 || atualizar.isPending}
+              onClick={async () => {
+                if (!divergenciaDe) return;
+                const { registro, status, motivo } = divergenciaDe;
+                await atualizar.mutateAsync({
+                  id: registro.id,
+                  dayId: registro.attendance_day_id,
+                  patch: {
+                    attendance_status: status,
+                    absence_reason_id: motivo ? motivoPorCodigo(motivo) : null,
+                    notes: `Divergência tratada: ${tratativa.trim()}`,
+                    source: "MANUAL",
+                  },
+                });
+                setDivergenciaDe(null);
+                setTratativa("");
+                toast.success("Divergência tratada e registrada na auditoria.");
+              }}
+            >
+              Confirmar tratamento
             </Button>
           </DialogFooter>
         </DialogContent>
