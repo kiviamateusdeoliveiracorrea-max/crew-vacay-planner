@@ -444,9 +444,24 @@ function ChamadaPage() {
                             }
                           />
                         </Td>
-                        <Td className="max-w-[180px] text-xs">{r.notes ?? "—"}</Td>
+                        <Td className="max-w-[180px] text-xs">
+                          {r.notes?.includes(MARCA_DIVERGENCIA) ? (
+                            <span className="font-medium text-destructive">{r.notes}</span>
+                          ) : (
+                            (r.notes ?? "—")
+                          )}
+                        </Td>
                         <Td>
                           <div className="flex flex-wrap gap-1">
+                            {!fechada && r.attendance_status !== "PRESENTE" && (
+                              <button
+                                title="Presente"
+                                onClick={() => void aplicarAcao(r, "PRESENTE")}
+                                className="rounded border border-emerald-500/40 px-1.5 py-0.5 text-[10px] text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400"
+                              >
+                                Presente
+                              </button>
+                            )}
                             {!fechada &&
                               ACOES_RAPIDAS.map((a) => (
                                 <button
