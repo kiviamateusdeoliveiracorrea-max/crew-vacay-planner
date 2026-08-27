@@ -663,6 +663,45 @@ function Painel() {
     </DropdownMenu>
   );
 
+  const Bloco = ({
+    titulo,
+    descricao,
+    cards,
+  }: {
+    titulo: string;
+    descricao: string;
+    cards: CardIndicador[];
+  }) => (
+    <section aria-label={titulo} className="space-y-3">
+      <div>
+        <h2 className="text-base font-semibold tracking-tight text-foreground">{titulo}</h2>
+        <p className="text-sm text-muted-foreground">{descricao}</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        {cards.map((c) => (
+          <div
+            key={c.titulo}
+            role="button"
+            tabIndex={0}
+            aria-label={`${c.titulo}: ${c.valor}. Abrir registros`}
+            onClick={() => setDrill(c.drill)}
+            onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && setDrill(c.drill)}
+            className="cursor-pointer rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-medium text-foreground">{c.titulo}</p>
+              <Acoes drill={c.drill} />
+            </div>
+            <p className={`mt-1 text-3xl font-semibold ${c.tom ?? "text-foreground"}`}>{c.valor}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{c.ajuda}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+
+
+
   const drillMes = (m: string, itens: VacationFull[]): NonNullable<Drilldown> => ({
     titulo: `Férias iniciadas em ${m}`,
     indicador: `Férias por mês — ${m}`,
