@@ -496,6 +496,7 @@ export type Database = {
           arquivo_nome: string
           created_at: string
           created_by: string | null
+          fonte: string
           id: string
           mapeamento: Json
           resumo: Json
@@ -512,6 +513,7 @@ export type Database = {
           arquivo_nome: string
           created_at?: string
           created_by?: string | null
+          fonte?: string
           id?: string
           mapeamento?: Json
           resumo?: Json
@@ -528,6 +530,7 @@ export type Database = {
           arquivo_nome?: string
           created_at?: string
           created_by?: string | null
+          fonte?: string
           id?: string
           mapeamento?: Json
           resumo?: Json
@@ -552,17 +555,21 @@ export type Database = {
           aplicado: boolean
           aplicar: boolean
           batch_id: string
+          campos_ignorados: string[]
           classificacao: Database["public"]["Enums"]["import_row_class"]
           created_at: string
           created_by: string | null
           dados: Json
+          decisao: string
           diferencas: Json
           employee_id: string | null
           erros: string[] | null
           id: string
+          justificativa: string | null
           linha: number
           setor_decisao: string | null
           setor_decisao_fim: string | null
+          setor_decisao_inicio: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -570,17 +577,21 @@ export type Database = {
           aplicado?: boolean
           aplicar?: boolean
           batch_id: string
+          campos_ignorados?: string[]
           classificacao: Database["public"]["Enums"]["import_row_class"]
           created_at?: string
           created_by?: string | null
           dados: Json
+          decisao?: string
           diferencas?: Json
           employee_id?: string | null
           erros?: string[] | null
           id?: string
+          justificativa?: string | null
           linha: number
           setor_decisao?: string | null
           setor_decisao_fim?: string | null
+          setor_decisao_inicio?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -588,17 +599,21 @@ export type Database = {
           aplicado?: boolean
           aplicar?: boolean
           batch_id?: string
+          campos_ignorados?: string[]
           classificacao?: Database["public"]["Enums"]["import_row_class"]
           created_at?: string
           created_by?: string | null
           dados?: Json
+          decisao?: string
           diferencas?: Json
           employee_id?: string | null
           erros?: string[] | null
           id?: string
+          justificativa?: string | null
           linha?: number
           setor_decisao?: string | null
           setor_decisao_fim?: string | null
+          setor_decisao_inicio?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -624,6 +639,7 @@ export type Database = {
           ativo: boolean
           created_at: string
           created_by: string | null
+          fonte: string
           id: string
           mapeamento: Json
           nome: string
@@ -634,6 +650,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           created_by?: string | null
+          fonte?: string
           id?: string
           mapeamento: Json
           nome: string
@@ -644,6 +661,7 @@ export type Database = {
           ativo?: boolean
           created_at?: string
           created_by?: string | null
+          fonte?: string
           id?: string
           mapeamento?: Json
           nome?: string
@@ -1249,6 +1267,11 @@ export type Database = {
         | "DUPLICIDADE"
         | "DADO_INVALIDO"
         | "SEM_ALTERACAO"
+        | "MUDANCA_DE_LIDER"
+        | "AFASTAMENTO"
+        | "RETORNO_DE_AFASTAMENTO"
+        | "REATIVACAO"
+        | "VAGA_ABERTA"
       import_status:
         | "RASCUNHO"
         | "VALIDADO"
@@ -1409,6 +1432,11 @@ export const Constants = {
         "DUPLICIDADE",
         "DADO_INVALIDO",
         "SEM_ALTERACAO",
+        "MUDANCA_DE_LIDER",
+        "AFASTAMENTO",
+        "RETORNO_DE_AFASTAMENTO",
+        "REATIVACAO",
+        "VAGA_ABERTA",
       ],
       import_status: [
         "RASCUNHO",
