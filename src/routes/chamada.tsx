@@ -277,6 +277,34 @@ function ChamadaPage() {
                   ))}
               </div>
             )}
+            {areaId && previstos.some((p) => p.divergencias.length) && (
+              <div className="sm:col-span-2 lg:col-span-5 space-y-2 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                <div className="font-semibold">{MARCA_DIVERGENCIA}</div>
+                {previstos
+                  .filter((p) => p.divergencias.length)
+                  .map((p) => (
+                    <div key={p.employee_id}>
+                      <div className="font-medium">
+                        {p.employee_re} — {p.employee_name_snapshot}
+                      </div>
+                      {p.divergencias.map((d) => (
+                        <div key={d.regra} className="pl-2">
+                          • {d.mensagem}{" "}
+                          {d.origens.map((o) => (
+                            <a
+                              key={o.id + d.regra}
+                              href={o.rota}
+                              className="underline underline-offset-2"
+                            >
+                              [{o.rotulo}]
+                            </a>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
