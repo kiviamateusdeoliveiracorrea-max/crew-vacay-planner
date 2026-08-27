@@ -1545,6 +1545,7 @@ export type Database = {
         Args: { _area_id: string; _user_id: string }
         Returns: boolean
       }
+      concluir_ferias_vencidas: { Args: never; Returns: Json }
       employee_area_on: {
         Args: { _data: string; _employee_id: string }
         Returns: string
