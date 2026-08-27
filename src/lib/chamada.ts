@@ -1,6 +1,6 @@
 import type { Enums, Tables } from "@/integrations/supabase/types";
 import type { Employee, Movement, Vacation } from "@/lib/sistema";
-import { lotacaoVigente } from "@/lib/movimentacao";
+import { lotacaoDefinitiva, lotacaoVigente } from "@/lib/movimentacao";
 
 export type ChamadaDia = Tables<"attendance_days">;
 export type ChamadaRegistro = Tables<"attendance_records">;
