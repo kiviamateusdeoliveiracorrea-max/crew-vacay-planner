@@ -16,6 +16,28 @@ import { Button } from "@/components/ui/button";
 import { DrilldownDialog, type Drilldown } from "@/components/painel/DrilldownDialog";
 import { RegistroDialog, type RegistroFoco } from "@/components/painel/RegistroDialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MoreVertical, Download, FileSpreadsheet, List } from "lucide-react";
+import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { exportarCsvComCabecalho, exportarXlsx } from "@/lib/exportar";
+import { registrarExportacao } from "@/lib/relatorios.functions";
+import type { Filtros, Tabela } from "@/lib/relatorios";
+import {
+  ctxPainel,
+  filtrosDoPainel,
+  parametrosPainel,
+  tabelaAgregada,
+  tabelaAVencerPainel,
+  tabelaFeriasPainel,
+  tabelaMovPainel,
+} from "@/lib/painel-export";
+import {
+  usePerfil,
   useCatalogos,
   useEmployees,
   useMovements,
@@ -50,6 +72,8 @@ export const Route = createFileRoute("/")({
 const TODOS = "__todos__";
 
 function Painel() {
+  const perfil = usePerfil();
+  const { user } = useAuth();
   const cat = useCatalogos();
   const emp = useEmployees();
   const fer = useVacations();
@@ -64,6 +88,7 @@ function Painel() {
   const [criticidade, setCriticidade] = useState(TODOS);
   const [drill, setDrill] = useState<Drilldown>(null);
   const [foco, setFoco] = useState<RegistroFoco>(null);
+  const [exportando, setExportando] = useState(false);
 
   const areas = cat.data?.areas ?? [];
   const turnos = cat.data?.turnos ?? [];
@@ -203,29 +228,163 @@ function Painel() {
 
   const carregando = cat.isLoading || fer.isLoading || mov.isLoading || emp.isLoading;
 
-  const indicadores: { titulo: string; valor: number; tom?: string; drill: Drilldown }[] = [
-    { titulo: "Férias no filtro", valor: ativas.length, drill: { titulo: "Férias no filtro", tipo: "ferias", itens: ativas } },
+  /* ------------------------------------------------- exportação dos indicadores */
+
+  const ctx = useMemo(
+    () =>
+      ctxPainel(
+        {
+          areas: areas.map((a) => ({ id: a.id, nome: a.nome, unit_id: a.unit_id })),
+          turnos: turnos.map((t) => ({ id: t.id, nome: t.nome })),
+          funcoes: funcoes.map((f) => ({ id: f.id, nome: f.nome, funcao_chave: f.funcao_chave })),
+          unidades: (cat.data?.unidades ?? []).map((u) => ({ id: u.id, nome: u.nome })),
+        },
+        (mov.data ?? []) as never,
+        perfil.tem("ADMIN") || perfil.tem("ANALISTA") ? null : perfil.areasPermitidas,
+      ),
+    [areas, turnos, funcoes, cat.data, mov.data, perfil.papeis, perfil.areasPermitidas],
+  );
+
+  const filtrosAtivos = useMemo(
+    () =>
+      filtrosDoPainel({
+        unidade: unidade === TODOS ? "" : unidade,
+        area: areaId === TODOS ? "" : areaId,
+        turno: shiftId === TODOS ? "" : shiftId,
+        funcao: functionId === TODOS ? "" : functionId,
+        mes,
+        status: status === TODOS ? "" : status,
+        criticidade: criticidade === TODOS ? "" : criticidade,
+      }),
+    [unidade, areaId, shiftId, functionId, mes, status, criticidade],
+  );
+
+  const rotulosFiltros = useMemo<Partial<Record<keyof Filtros, string>>>(
+    () => {
+      const r: Partial<Record<keyof Filtros, string>> = {};
+      if (unidade !== TODOS) r.unidade = unidade;
+      if (areaId !== TODOS) r.area = nomeArea(areaId);
+      if (shiftId !== TODOS) r.turno = nomeTurno(shiftId);
+      if (functionId !== TODOS) r.funcao = nomeFuncao(functionId);
+      return r;
+    },
+    [unidade, areaId, shiftId, functionId, areas, turnos, funcoes],
+  );
+
+  const tFerias = (itens: VacationFull[]) => tabelaFeriasPainel(ctx, itens as never);
+  const tMov = (itens: MovementFull[]) => tabelaMovPainel(ctx, itens as never);
+
+  const empsFiltrados = useMemo(() => {
+    const idsArea = new Set(areasVisiveis.map((a) => a.id));
+    return employees.filter((e) => {
+      if (e.status !== "ATIVO") return false;
+      if (!idsArea.has(e.area_id ?? "")) return false;
+      if (areaId !== TODOS && e.area_id !== areaId) return false;
+      if (shiftId !== TODOS && e.shift_id !== shiftId) return false;
+      if (functionId !== TODOS && e.function_id !== functionId) return false;
+      return true;
+    });
+  }, [employees, areasVisiveis, areaId, shiftId, functionId]);
+
+  const aVencer = useMemo(
+    () => tabelaAVencerPainel(ctx, empsFiltrados as never, ativas as never),
+    [ctx, empsFiltrados, fer.data, areasVisiveis, areaId, shiftId, functionId, status, mes, criticidade],
+  );
+
+  const emailUsuario = user?.email ?? "usuário autenticado";
+
+  async function exportar(d: NonNullable<Drilldown>, formato: "XLSX" | "CSV") {
+    if (exportando) return;
+    const tabelas: Tabela[] = [d.tabela, ...(d.extras ?? [])];
+    const total = tabelas.reduce((s, t) => s + t.linhas.length, 0);
+    if (total === 0) {
+      toast.info("Nenhum registro para os filtros aplicados.");
+      return;
+    }
+    setExportando(true);
+    try {
+      const params = parametrosPainel(d.indicador, filtrosAtivos, emailUsuario, rotulosFiltros);
+      const nome = `Painel — ${d.indicador}`;
+      if (formato === "XLSX") exportarXlsx(tabelas, params, nome);
+      else exportarCsvComCabecalho(tabelas[0]!, params, nome);
+      await registrarExportacao({
+        data: {
+          relatorio: `PAINEL_${d.indicador.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`,
+          formato,
+          filtros: Object.fromEntries(Object.entries(filtrosAtivos).filter(([, v]) => v)),
+          totais: Object.fromEntries(tabelas.map((t) => [t.nome, t.linhas.length])),
+        },
+      });
+      toast.success(`${d.indicador}: ${total} registro(s) exportado(s) em ${formato}.`);
+    } catch (e) {
+      toast.error(`Falha ao exportar: ${e instanceof Error ? e.message : "erro inesperado"}`);
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  const indicadores: { titulo: string; valor: number; tom?: string; drill: NonNullable<Drilldown> }[] = [
+    {
+      titulo: "Férias no filtro",
+      valor: ativas.length,
+      drill: { titulo: "Férias no filtro", indicador: "Férias no filtro", tipo: "ferias", itens: ativas, tabela: tFerias(ativas) },
+    },
     {
       titulo: "Férias críticas",
       valor: criticas.length,
       tom: "text-destructive",
-      drill: { titulo: "Férias com conflito crítico ou bloqueio", tipo: "ferias", itens: criticas },
+      drill: {
+        titulo: "Férias com conflito crítico ou bloqueio",
+        indicador: "Férias críticas",
+        tipo: "ferias",
+        itens: criticas,
+        tabela: tFerias(criticas),
+      },
     },
     {
       titulo: "Funções-chave impactadas",
       valor: chaveImpactadas.length,
       tom: "text-amber-500",
-      drill: { titulo: "Férias de funções-chave", tipo: "ferias", itens: chaveImpactadas },
+      drill: {
+        titulo: "Férias de funções-chave",
+        indicador: "Funções-chave impactadas",
+        tipo: "ferias",
+        itens: chaveImpactadas,
+        tabela: tFerias(chaveImpactadas),
+      },
     },
     {
       titulo: "Férias sem substituto",
       valor: semSubstituto.length,
-      drill: { titulo: "Férias sem substituto indicado", tipo: "ferias", itens: semSubstituto },
+      drill: {
+        titulo: "Férias sem substituto indicado",
+        indicador: "Férias sem substituto",
+        tipo: "ferias",
+        itens: semSubstituto,
+        tabela: tFerias(semSubstituto),
+      },
+    },
+    {
+      titulo: "Férias a vencer",
+      valor: aVencer.linhas.length,
+      tom: "text-amber-500",
+      drill: {
+        titulo: "Férias a vencer",
+        indicador: "Férias a vencer",
+        tipo: "tabela",
+        tabela: aVencer,
+      },
     },
     {
       titulo: "Movimentações previstas",
       valor: previstas.length,
-      drill: { titulo: "Movimentações previstas", tipo: "movimentacoes", itens: previstas },
+      drill: {
+        titulo: "Movimentações previstas",
+        indicador: "Movimentações previstas",
+        tipo: "movimentacoes",
+        itens: previstas,
+        tabela: tMov(previstas),
+      },
     },
     {
       titulo: "Movimentação durante férias",
@@ -233,16 +392,101 @@ function Painel() {
       tom: "text-destructive",
       drill: {
         titulo: "Férias com movimentação no período",
+        indicador: "Movimentação durante férias",
         tipo: "ferias",
         itens: movDuranteFerias,
+        tabela: tFerias(movDuranteFerias),
       },
     },
     {
       titulo: "Pendências de aprovação",
       valor: pendencias.length,
-      drill: { titulo: "Movimentações pendentes de aprovação", tipo: "movimentacoes", itens: pendencias },
+      drill: {
+        titulo: "Movimentações pendentes de aprovação",
+        indicador: "Pendências de aprovação",
+        tipo: "movimentacoes",
+        itens: pendencias,
+        tabela: tMov(pendencias),
+      },
     },
   ];
+
+  const Acoes = ({ drill }: { drill: NonNullable<Drilldown> }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          aria-label={`Ações do indicador ${drill.indicador}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem onSelect={() => setDrill(drill)}>
+          <List className="mr-2 h-4 w-4" /> Ver detalhes
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={exportando} onSelect={() => void exportar(drill, "XLSX")}>
+          <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={exportando} onSelect={() => void exportar(drill, "CSV")}>
+          <Download className="mr-2 h-4 w-4" /> Exportar CSV
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const drillMes = (m: string, itens: VacationFull[]): NonNullable<Drilldown> => ({
+    titulo: `Férias iniciadas em ${m}`,
+    indicador: `Férias por mês — ${m}`,
+    tipo: "ferias",
+    itens,
+    tabela: tFerias(itens),
+  });
+
+  const drillArea = (id: string, itens: VacationFull[]): NonNullable<Drilldown> => ({
+    titulo: `Férias — ${nomeArea(id)}`,
+    indicador: `Férias por área — ${nomeArea(id)}`,
+    tipo: "ferias",
+    itens,
+    tabela: tFerias(itens),
+  });
+
+  const drillGraficoMes: NonNullable<Drilldown> = {
+    titulo: "Férias por mês",
+    indicador: "Férias por mês",
+    tipo: "ferias",
+    itens: ativas,
+    tabela: tFerias(ativas),
+    extras: [tabelaAgregada("Férias por mês", "Mês", porMes.map(([m, i]) => [m, i.length]))],
+  };
+
+  const drillGraficoArea: NonNullable<Drilldown> = {
+    titulo: "Férias por área",
+    indicador: "Férias por área",
+    tipo: "ferias",
+    itens: ativas,
+    tabela: tFerias(ativas),
+    extras: [
+      tabelaAgregada("Férias por área", "Área", porArea.map(([id, i]) => [nomeArea(id), i.length])),
+    ],
+  };
+
+  const tabelaCapacidade: Tabela = {
+    nome: "Capacidade por função e turno",
+    colunas: ["Função", "Função-chave", "Turno", "Efetivo", "Em férias", "Disponível"],
+    linhas: capacidade.map((l) => [l.funcao, l.chave ? "Sim" : "Não", l.turno, l.total, l.ferias, l.total - l.ferias]),
+  };
+
+  const drillCapacidade: NonNullable<Drilldown> = {
+    titulo: `Capacidade por função e turno ${mes ? `(${mes})` : "(mês atual)"}`,
+    indicador: "Capacidade por função e turno",
+    tipo: "tabela",
+    tabela: tabelaCapacidade,
+    extras: [tFerias(ativas)],
+  };
 
   return (
     <AppShell>
@@ -307,32 +551,39 @@ function Painel() {
           <>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
               {indicadores.map((i) => (
-                <button
+                <div
                   key={i.titulo}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setDrill(i.drill)}
-                  className="rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent/40"
+                  onKeyDown={(e) => e.key === "Enter" && setDrill(i.drill)}
+                  className="cursor-pointer rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-primary/60 hover:bg-accent/40"
                 >
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground">{i.titulo}</p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                      {i.titulo}
+                    </p>
+                    <Acoes drill={i.drill} />
+                  </div>
                   <p className={`mt-1 text-2xl font-semibold ${i.tom ?? "text-foreground"}`}>
                     {i.valor}
                   </p>
-                </button>
+                </div>
               ))}
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm">Férias por mês</CardTitle>
+                  <Acoes drill={drillGraficoMes} />
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {porMes.length === 0 && <p className="text-sm text-muted-foreground">Sem dados.</p>}
                   {porMes.map(([m, itens]) => (
                     <button
                       key={m}
-                      onClick={() =>
-                        setDrill({ titulo: `Férias iniciadas em ${m}`, tipo: "ferias", itens })
-                      }
+                      onClick={() => setDrill(drillMes(m, itens))}
                       className="flex w-full items-center gap-3 rounded-md px-2 py-1 text-left hover:bg-accent"
                     >
                       <span className="w-16 text-xs text-muted-foreground">{m}</span>
@@ -351,17 +602,16 @@ function Painel() {
               </Card>
 
               <Card>
-                <CardHeader className="pb-2">
+                <CardHeader className="flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm">Férias por área</CardTitle>
+                  <Acoes drill={drillGraficoArea} />
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {porArea.length === 0 && <p className="text-sm text-muted-foreground">Sem dados.</p>}
                   {porArea.map(([id, itens]) => (
                     <button
                       key={id}
-                      onClick={() =>
-                        setDrill({ titulo: `Férias — ${nomeArea(id)}`, tipo: "ferias", itens })
-                      }
+                      onClick={() => setDrill(drillArea(id, itens))}
                       className="flex w-full items-center gap-3 rounded-md px-2 py-1 text-left hover:bg-accent"
                     >
                       <span className="w-40 truncate text-xs text-muted-foreground">
@@ -387,9 +637,12 @@ function Painel() {
                 <CardTitle className="text-sm">
                   Capacidade disponível por função e turno {mes ? `(${mes})` : "(mês atual)"}
                 </CardTitle>
-                <Button variant="ghost" size="sm" onClick={() => setMes("")}>
-                  Limpar mês
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => setMes("")}>
+                    Limpar mês
+                  </Button>
+                  <Acoes drill={drillCapacidade} />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -412,8 +665,10 @@ function Painel() {
                             onClick={() =>
                               setDrill({
                                 titulo: `Férias — ${l.funcao} · turno ${l.turno}`,
+                                indicador: `Capacidade — ${l.funcao} · turno ${l.turno}`,
                                 tipo: "ferias",
                                 itens: l.itens,
+                                tabela: tFerias(l.itens),
                               })
                             }
                             className="cursor-pointer border-b border-border/60 hover:bg-accent/40"
@@ -459,6 +714,8 @@ function Painel() {
         data={drill}
         onClose={() => setDrill(null)}
         onAbrirRegistro={setFoco}
+        onExportar={(d, f) => void exportar(d, f)}
+        exportando={exportando}
         nomeArea={nomeArea}
         nomeTurno={nomeTurno}
         nomeFuncao={nomeFuncao}
