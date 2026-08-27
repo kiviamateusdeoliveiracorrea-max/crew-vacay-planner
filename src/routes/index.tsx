@@ -321,29 +321,68 @@ function Painel() {
     }
   }
 
-  const indicadores: { titulo: string; valor: number; tom?: string; drill: Drilldown }[] = [
-    { titulo: "Férias no filtro", valor: ativas.length, drill: { titulo: "Férias no filtro", tipo: "ferias", itens: ativas } },
+  const indicadores: { titulo: string; valor: number; tom?: string; drill: NonNullable<Drilldown> }[] = [
+    {
+      titulo: "Férias no filtro",
+      valor: ativas.length,
+      drill: { titulo: "Férias no filtro", indicador: "Férias no filtro", tipo: "ferias", itens: ativas, tabela: tFerias(ativas) },
+    },
     {
       titulo: "Férias críticas",
       valor: criticas.length,
       tom: "text-destructive",
-      drill: { titulo: "Férias com conflito crítico ou bloqueio", tipo: "ferias", itens: criticas },
+      drill: {
+        titulo: "Férias com conflito crítico ou bloqueio",
+        indicador: "Férias críticas",
+        tipo: "ferias",
+        itens: criticas,
+        tabela: tFerias(criticas),
+      },
     },
     {
       titulo: "Funções-chave impactadas",
       valor: chaveImpactadas.length,
       tom: "text-amber-500",
-      drill: { titulo: "Férias de funções-chave", tipo: "ferias", itens: chaveImpactadas },
+      drill: {
+        titulo: "Férias de funções-chave",
+        indicador: "Funções-chave impactadas",
+        tipo: "ferias",
+        itens: chaveImpactadas,
+        tabela: tFerias(chaveImpactadas),
+      },
     },
     {
       titulo: "Férias sem substituto",
       valor: semSubstituto.length,
-      drill: { titulo: "Férias sem substituto indicado", tipo: "ferias", itens: semSubstituto },
+      drill: {
+        titulo: "Férias sem substituto indicado",
+        indicador: "Férias sem substituto",
+        tipo: "ferias",
+        itens: semSubstituto,
+        tabela: tFerias(semSubstituto),
+      },
+    },
+    {
+      titulo: "Férias a vencer",
+      valor: aVencer.linhas.length,
+      tom: "text-amber-500",
+      drill: {
+        titulo: "Férias a vencer",
+        indicador: "Férias a vencer",
+        tipo: "tabela",
+        tabela: aVencer,
+      },
     },
     {
       titulo: "Movimentações previstas",
       valor: previstas.length,
-      drill: { titulo: "Movimentações previstas", tipo: "movimentacoes", itens: previstas },
+      drill: {
+        titulo: "Movimentações previstas",
+        indicador: "Movimentações previstas",
+        tipo: "movimentacoes",
+        itens: previstas,
+        tabela: tMov(previstas),
+      },
     },
     {
       titulo: "Movimentação durante férias",
@@ -351,16 +390,101 @@ function Painel() {
       tom: "text-destructive",
       drill: {
         titulo: "Férias com movimentação no período",
+        indicador: "Movimentação durante férias",
         tipo: "ferias",
         itens: movDuranteFerias,
+        tabela: tFerias(movDuranteFerias),
       },
     },
     {
       titulo: "Pendências de aprovação",
       valor: pendencias.length,
-      drill: { titulo: "Movimentações pendentes de aprovação", tipo: "movimentacoes", itens: pendencias },
+      drill: {
+        titulo: "Movimentações pendentes de aprovação",
+        indicador: "Pendências de aprovação",
+        tipo: "movimentacoes",
+        itens: pendencias,
+        tabela: tMov(pendencias),
+      },
     },
   ];
+
+  const Acoes = ({ drill }: { drill: NonNullable<Drilldown> }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 shrink-0"
+          aria-label={`Ações do indicador ${drill.indicador}`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <MoreVertical className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem onSelect={() => setDrill(drill)}>
+          <List className="mr-2 h-4 w-4" /> Ver detalhes
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={exportando} onSelect={() => void exportar(drill, "XLSX")}>
+          <FileSpreadsheet className="mr-2 h-4 w-4" /> Exportar Excel
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={exportando} onSelect={() => void exportar(drill, "CSV")}>
+          <Download className="mr-2 h-4 w-4" /> Exportar CSV
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const drillMes = (m: string, itens: VacationFull[]): NonNullable<Drilldown> => ({
+    titulo: `Férias iniciadas em ${m}`,
+    indicador: `Férias por mês — ${m}`,
+    tipo: "ferias",
+    itens,
+    tabela: tFerias(itens),
+  });
+
+  const drillArea = (id: string, itens: VacationFull[]): NonNullable<Drilldown> => ({
+    titulo: `Férias — ${nomeArea(id)}`,
+    indicador: `Férias por área — ${nomeArea(id)}`,
+    tipo: "ferias",
+    itens,
+    tabela: tFerias(itens),
+  });
+
+  const drillGraficoMes: NonNullable<Drilldown> = {
+    titulo: "Férias por mês",
+    indicador: "Férias por mês",
+    tipo: "ferias",
+    itens: ativas,
+    tabela: tFerias(ativas),
+    extras: [tabelaAgregada("Férias por mês", "Mês", porMes.map(([m, i]) => [m, i.length]))],
+  };
+
+  const drillGraficoArea: NonNullable<Drilldown> = {
+    titulo: "Férias por área",
+    indicador: "Férias por área",
+    tipo: "ferias",
+    itens: ativas,
+    tabela: tFerias(ativas),
+    extras: [
+      tabelaAgregada("Férias por área", "Área", porArea.map(([id, i]) => [nomeArea(id), i.length])),
+    ],
+  };
+
+  const tabelaCapacidade: Tabela = {
+    nome: "Capacidade por função e turno",
+    colunas: ["Função", "Função-chave", "Turno", "Efetivo", "Em férias", "Disponível"],
+    linhas: capacidade.map((l) => [l.funcao, l.chave ? "Sim" : "Não", l.turno, l.total, l.ferias, l.total - l.ferias]),
+  };
+
+  const drillCapacidade: NonNullable<Drilldown> = {
+    titulo: `Capacidade por função e turno ${mes ? `(${mes})` : "(mês atual)"}`,
+    indicador: "Capacidade por função e turno",
+    tipo: "tabela",
+    tabela: tabelaCapacidade,
+    extras: [tFerias(ativas)],
+  };
 
   return (
     <AppShell>
