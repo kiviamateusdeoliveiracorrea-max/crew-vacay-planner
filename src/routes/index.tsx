@@ -26,7 +26,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { exportarCsvComCabecalho, exportarXlsx } from "@/lib/exportar";
 import { registrarExportacao } from "@/lib/relatorios.functions";
-import type { Tabela } from "@/lib/relatorios";
+import type { Filtros, Tabela } from "@/lib/relatorios";
 import {
   ctxPainel,
   filtrosDoPainel,
@@ -259,13 +259,15 @@ function Painel() {
     [unidade, areaId, shiftId, functionId, mes, status, criticidade],
   );
 
-  const rotulosFiltros = useMemo(
-    () => ({
-      unidade: unidade === TODOS ? undefined : unidade,
-      area: areaId === TODOS ? undefined : nomeArea(areaId),
-      turno: shiftId === TODOS ? undefined : nomeTurno(shiftId),
-      funcao: functionId === TODOS ? undefined : nomeFuncao(functionId),
-    }),
+  const rotulosFiltros = useMemo<Partial<Record<keyof Filtros, string>>>(
+    () => {
+      const r: Partial<Record<keyof Filtros, string>> = {};
+      if (unidade !== TODOS) r.unidade = unidade;
+      if (areaId !== TODOS) r.area = nomeArea(areaId);
+      if (shiftId !== TODOS) r.turno = nomeTurno(shiftId);
+      if (functionId !== TODOS) r.funcao = nomeFuncao(functionId);
+      return r;
+    },
     [unidade, areaId, shiftId, functionId, areas, turnos, funcoes],
   );
 
