@@ -403,16 +403,115 @@ function Painel() {
     }
   }
 
-  const indicadores: { titulo: string; valor: number; tom?: string; drill: NonNullable<Drilldown> }[] = [
+  type CardIndicador = {
+    titulo: string;
+    valor: number;
+    ajuda: string;
+    tom?: string;
+    drill: NonNullable<Drilldown>;
+  };
+
+  const blocoResumo: CardIndicador[] = [
     {
-      titulo: "Férias no filtro",
+      titulo: "Colaboradores previstos",
+      valor: registrosHoje.length,
+      ajuda: "Escalados nas chamadas de hoje",
+      drill: {
+        titulo: "Colaboradores previstos hoje",
+        indicador: "Colaboradores previstos",
+        tipo: "tabela",
+        tabela: tabRegistros("Previstos hoje", registrosHoje),
+      },
+    },
+    {
+      titulo: "Presentes",
+      valor: presentesHoje.length,
+      ajuda: "Confirmados como presentes",
+      tom: "text-success",
+      drill: {
+        titulo: "Presentes hoje",
+        indicador: "Presentes",
+        tipo: "tabela",
+        tabela: tabRegistros("Presentes hoje", presentesHoje),
+      },
+    },
+    {
+      titulo: "Ausentes",
+      valor: ausentesHoje.length,
+      ajuda: "Faltas, atestados e justificativas",
+      tom: ausentesHoje.length > 0 ? "text-high" : undefined,
+      drill: {
+        titulo: "Ausências de hoje",
+        indicador: "Ausentes",
+        tipo: "tabela",
+        tabela: tabRegistros("Ausentes hoje", ausentesHoje),
+      },
+    },
+    {
+      titulo: "Em férias",
+      valor: feriasHoje.length,
+      ajuda: "Colaboradores em gozo de férias hoje",
+      drill: {
+        titulo: "Em férias hoje",
+        indicador: "Em férias",
+        tipo: "ferias",
+        itens: feriasHoje,
+        tabela: tFerias(feriasHoje),
+      },
+    },
+    {
+      titulo: "Afastados",
+      valor: afastados.length,
+      ajuda: "Cadastro com afastamento vigente",
+      drill: {
+        titulo: "Colaboradores afastados",
+        indicador: "Afastados",
+        tipo: "tabela",
+        tabela: tab(
+          "Afastados",
+          ["RE", "Colaborador", "Área", "Turno", "Função"],
+          afastados.map((e) => [
+            e.re,
+            e.nome,
+            nomeArea(e.area_id),
+            nomeTurno(e.shift_id),
+            nomeFuncao(e.function_id),
+          ]),
+        ),
+      },
+    },
+    {
+      titulo: "Chamadas pendentes",
+      valor: chamadasPendentesHoje.length,
+      ajuda: "Chamadas de hoje ainda sem fechamento",
+      tom: chamadasPendentesHoje.length > 0 ? "text-warning" : undefined,
+      drill: {
+        titulo: "Chamadas de hoje sem fechamento",
+        indicador: "Chamadas pendentes",
+        tipo: "tabela",
+        tabela: tabChamadas("Chamadas pendentes", chamadasPendentesHoje),
+      },
+    },
+  ];
+
+  const blocoPlanejamento: CardIndicador[] = [
+    {
+      titulo: "Férias programadas",
       valor: ativas.length,
-      drill: { titulo: "Férias no filtro", indicador: "Férias no filtro", tipo: "ferias", itens: ativas, tabela: tFerias(ativas) },
+      ajuda: "Programações válidas nos filtros atuais",
+      drill: {
+        titulo: "Férias programadas",
+        indicador: "Férias programadas",
+        tipo: "ferias",
+        itens: ativas,
+        tabela: tFerias(ativas),
+      },
     },
     {
       titulo: "Férias críticas",
       valor: criticas.length,
-      tom: "text-destructive",
+      ajuda: "Com conflito crítico ou bloqueio",
+      tom: criticas.length > 0 ? "text-critical" : undefined,
       drill: {
         titulo: "Férias com conflito crítico ou bloqueio",
         indicador: "Férias críticas",
@@ -422,32 +521,10 @@ function Painel() {
       },
     },
     {
-      titulo: "Funções-chave impactadas",
-      valor: chaveImpactadas.length,
-      tom: "text-amber-500",
-      drill: {
-        titulo: "Férias de funções-chave",
-        indicador: "Funções-chave impactadas",
-        tipo: "ferias",
-        itens: chaveImpactadas,
-        tabela: tFerias(chaveImpactadas),
-      },
-    },
-    {
-      titulo: "Férias sem substituto",
-      valor: semSubstituto.length,
-      drill: {
-        titulo: "Férias sem substituto indicado",
-        indicador: "Férias sem substituto",
-        tipo: "ferias",
-        itens: semSubstituto,
-        tabela: tFerias(semSubstituto),
-      },
-    },
-    {
       titulo: "Férias a vencer",
       valor: aVencer.linhas.length,
-      tom: "text-amber-500",
+      ajuda: "Saldo próximo do limite legal",
+      tom: aVencer.linhas.length > 0 ? "text-high" : undefined,
       drill: {
         titulo: "Férias a vencer",
         indicador: "Férias a vencer",
@@ -456,40 +533,108 @@ function Painel() {
       },
     },
     {
-      titulo: "Movimentações previstas",
-      valor: previstas.length,
+      titulo: "Funções-chave sem substituto",
+      valor: chaveSemSubstituto.length,
+      ajuda: "Cobertura ainda não indicada",
+      tom: chaveSemSubstituto.length > 0 ? "text-high" : undefined,
       drill: {
-        titulo: "Movimentações previstas",
-        indicador: "Movimentações previstas",
-        tipo: "movimentacoes",
-        itens: previstas,
-        tabela: tMov(previstas),
-      },
-    },
-    {
-      titulo: "Movimentação durante férias",
-      valor: movDuranteFerias.length,
-      tom: "text-destructive",
-      drill: {
-        titulo: "Férias com movimentação no período",
-        indicador: "Movimentação durante férias",
+        titulo: "Funções-chave sem substituto indicado",
+        indicador: "Funções-chave sem substituto",
         tipo: "ferias",
-        itens: movDuranteFerias,
-        tabela: tFerias(movDuranteFerias),
+        itens: chaveSemSubstituto,
+        tabela: tFerias(chaveSemSubstituto),
       },
     },
     {
-      titulo: "Pendências de aprovação",
+      titulo: "Movimentações temporárias",
+      valor: temporariasVigentes.length,
+      ajuda: "Empréstimos e coberturas vigentes",
+      drill: {
+        titulo: "Movimentações temporárias vigentes",
+        indicador: "Movimentações temporárias",
+        tipo: "movimentacoes",
+        itens: temporariasVigentes,
+        tabela: tMov(temporariasVigentes),
+      },
+    },
+  ];
+
+  const blocoAcoes: CardIndicador[] = [
+    {
+      titulo: "Aprovações pendentes",
       valor: pendencias.length,
+      ajuda: "Movimentações aguardando decisão",
+      tom: pendencias.length > 0 ? "text-warning" : undefined,
       drill: {
         titulo: "Movimentações pendentes de aprovação",
-        indicador: "Pendências de aprovação",
+        indicador: "Aprovações pendentes",
         tipo: "movimentacoes",
         itens: pendencias,
         tabela: tMov(pendencias),
       },
     },
+    {
+      titulo: "Conflitos críticos",
+      valor: criticas.length,
+      ajuda: "Precisam de tratativa da liderança",
+      tom: criticas.length > 0 ? "text-critical" : undefined,
+      drill: {
+        titulo: "Conflitos críticos de férias",
+        indicador: "Conflitos críticos",
+        tipo: "ferias",
+        itens: criticas,
+        tabela: tFerias(criticas),
+      },
+    },
+    {
+      titulo: "Bases aguardando validação",
+      valor: (lotes.data ?? []).length,
+      ajuda: "Importações não processadas",
+      tom: (lotes.data ?? []).length > 0 ? "text-warning" : undefined,
+      drill: {
+        titulo: "Lotes de importação aguardando validação",
+        indicador: "Bases aguardando validação",
+        tipo: "tabela",
+        tabela: tab(
+          "Lotes pendentes",
+          ["Arquivo", "Fonte", "Situação", "Linhas", "Criado em"],
+          (lotes.data ?? []).map((l) => [
+            l.arquivo_nome,
+            humaniza(l.fonte),
+            humaniza(l.status),
+            l.total_linhas,
+            fmtDataHora(l.created_at),
+          ]),
+        ),
+      },
+    },
+    {
+      titulo: "Chamadas não fechadas",
+      valor: chamadasNaoFechadas.length,
+      ajuda: "Últimos 30 dias sem fechamento",
+      tom: chamadasNaoFechadas.length > 0 ? "text-critical" : undefined,
+      drill: {
+        titulo: "Chamadas sem fechamento",
+        indicador: "Chamadas não fechadas",
+        tipo: "tabela",
+        tabela: tabChamadas("Chamadas não fechadas", chamadasNaoFechadas),
+      },
+    },
+    {
+      titulo: "Movimentações encerrando",
+      valor: temporariasEncerrando.length,
+      ajuda: "Temporárias que terminam em até 7 dias",
+      tom: temporariasEncerrando.length > 0 ? "text-high" : undefined,
+      drill: {
+        titulo: "Movimentações temporárias próximas do encerramento",
+        indicador: "Movimentações encerrando",
+        tipo: "movimentacoes",
+        itens: temporariasEncerrando,
+        tabela: tMov(temporariasEncerrando),
+      },
+    },
   ];
+
 
   const Acoes = ({ drill }: { drill: NonNullable<Drilldown> }) => (
     <DropdownMenu>
