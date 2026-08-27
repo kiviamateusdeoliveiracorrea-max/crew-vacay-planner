@@ -7,13 +7,17 @@ export function useResumoDoDia(dia: string) {
   return useQuery({
     queryKey: ["painel-inicio", "chamada", dia],
     queryFn: async () => {
+      const desde = new Date(new Date(dia).getTime() - 30 * 86400000).toISOString().slice(0, 10);
       const { data: dias, error } = await supabase
         .from("attendance_days")
         .select("*")
-        .eq("attendance_date", dia);
+        .gte("attendance_date", desde)
+        .lte("attendance_date", dia)
+        .order("attendance_date", { ascending: false });
       if (error) throw error;
 
-      const ids = (dias ?? []).map((d) => d.id);
+      const doDia = (dias ?? []).filter((d) => d.attendance_date === dia);
+      const ids = doDia.map((d) => d.id);
       let registros: ChamadaRegistro[] = [];
       if (ids.length) {
         const { data: regs, error: e2 } = await supabase
@@ -23,10 +27,15 @@ export function useResumoDoDia(dia: string) {
         if (e2) throw e2;
         registros = (regs ?? []) as ChamadaRegistro[];
       }
-      return { dias: (dias ?? []) as ChamadaDia[], registros };
+      return {
+        dias: (dias ?? []) as ChamadaDia[],
+        diasDoDia: doDia as ChamadaDia[],
+        registros,
+      };
     },
   });
 }
+
 
 /** Somente leitura: lotes de importação que ainda aguardam validação/aprovação. */
 export function useLotesPendentes() {
