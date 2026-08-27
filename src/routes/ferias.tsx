@@ -1,3 +1,5 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
+import { rotularCodigo } from "@/lib/mensagens";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -20,8 +22,6 @@ import {
 } from "@/hooks/useSistema";
 import { severidadeMax } from "@/lib/conflitos";
 import {
-import { useAvisoErro } from "@/hooks/useAvisoErro";
-import { rotularCodigo } from "@/lib/mensagens";
   diasEntre,
   fmtData,
   humaniza,

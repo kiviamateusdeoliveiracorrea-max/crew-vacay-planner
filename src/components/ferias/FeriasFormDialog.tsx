@@ -1,3 +1,4 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
@@ -23,7 +24,6 @@ import { useSalvarFerias, type VacationFull, type MovementFull } from "@/hooks/u
 import type { Area, CoverageRule, Employee, Funcao, Turno, Vacation } from "@/lib/sistema";
 import { fmtData, humaniza, severidadeClasse, SEVERIDADE_LABEL } from "@/lib/sistema";
 import { avaliarFerias } from "@/lib/motor-conflitos";
-import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 
 const STATUS: Vacation["status"][] = [

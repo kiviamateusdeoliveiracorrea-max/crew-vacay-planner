@@ -1,3 +1,5 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
+import { rotularCodigo } from "@/lib/mensagens";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
@@ -70,8 +72,6 @@ import {
 import { MODELOS, VERSAO_MODELO, baixarModelo } from "@/lib/modelo-importacao";
 import { humaniza, normaliza } from "@/lib/sistema";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
-import { useAvisoErro } from "@/hooks/useAvisoErro";
-import { rotularCodigo } from "@/lib/mensagens";
 
 export const Route = createFileRoute("/importar")({
   head: () => ({

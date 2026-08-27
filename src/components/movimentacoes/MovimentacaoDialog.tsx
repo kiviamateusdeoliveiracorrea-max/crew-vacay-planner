@@ -1,3 +1,5 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
+import { rotularCodigo } from "@/lib/mensagens";
 import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
@@ -24,8 +26,6 @@ import { useSalvarMovimentacao, type MovementFull } from "@/hooks/useSistema";
 import type { Area, Employee, Movement, Turno } from "@/lib/sistema";
 import { fmtData, humaniza, sobrepoe, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
 import {
-import { useAvisoErro } from "@/hooks/useAvisoErro";
-import { rotularCodigo } from "@/lib/mensagens";
   ehDefinitivo,
   ehTemporario,
   lotacaoDefinitiva,

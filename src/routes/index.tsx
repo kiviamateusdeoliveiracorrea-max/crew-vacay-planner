@@ -1,3 +1,4 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -49,7 +50,6 @@ import {
 import { useResumoDoDia, useLotesPendentes } from "@/hooks/usePainelInicio";
 import { ehCritico, severidadeMax } from "@/lib/conflitos";
 import { fmtDataHora, humaniza, mesDe, sobrepoe, SEVERIDADE_PESO, type Severidade } from "@/lib/sistema";
-import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 export const Route = createFileRoute("/")({
   head: () => ({

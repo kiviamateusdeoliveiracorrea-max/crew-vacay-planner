@@ -1,3 +1,4 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,6 @@ import {
   useSolicitarAcesso,
 } from "@/hooks/useAcessos";
 import { fmtDataHora } from "@/lib/sistema";
-import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDENTE: "Aguardando aprovação",

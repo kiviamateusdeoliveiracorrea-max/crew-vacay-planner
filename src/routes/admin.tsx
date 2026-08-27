@@ -1,3 +1,4 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
@@ -16,7 +17,6 @@ import {
   useUsuariosAcesso,
 } from "@/hooks/useAcessos";
 import { PAPEIS, PAPEL_DESCRICAO, fmtDataHora, type Papel } from "@/lib/sistema";
-import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 
 export const Route = createFileRoute("/admin")({

@@ -1,3 +1,4 @@
+import { mensagemAutenticacao } from "@/lib/mensagens";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -10,7 +11,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { toast } from "sonner";
 import intralogLogoAsset from "@/assets/intralog-logo.png.asset.json";
 import { APP_NOME, APP_SUBTITULO } from "@/components/layout/Marca";
-import { mensagemAutenticacao } from "@/lib/mensagens";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({

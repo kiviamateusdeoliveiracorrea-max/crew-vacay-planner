@@ -1,3 +1,4 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -48,7 +49,6 @@ import {
   type StatusPresenca,
 } from "@/lib/chamada";
 import { fmtData, fmtDataHora } from "@/lib/sistema";
-import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 const SEM_TURNO = "__sem_turno__";
 

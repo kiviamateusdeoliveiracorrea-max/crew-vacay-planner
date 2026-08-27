@@ -1,7 +1,7 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useDiagnosticoAcesso, usePromoverPrimeiroAdmin } from "@/hooks/useAcessos";
-import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 export function BootstrapAdmin() {
   const avisarErro = useAvisoErro();
