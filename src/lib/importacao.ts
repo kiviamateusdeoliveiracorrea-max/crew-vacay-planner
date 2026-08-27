@@ -158,7 +158,10 @@ export function detectarCamposSensiveis(colunas: string[]): ColunaIgnorada[] {
   for (const col of colunas) {
     const n = normaliza(col);
     const achou = SENSIVEIS.find(({ termo }) =>
-      termo.length <= 3 ? n.split(/[^A-Z0-9]+/).includes(termo) : n.includes(termo),
+      termo.length <= 3
+        ? n.split(/[^A-Z0-9]+/).includes(termo)
+        : // início de palavra, para não confundir "ATIVIDADE"/"UNIDADE" com "IDADE".
+          new RegExp(`(^|[^A-Z0-9])${termo.replace(/ /g, "[^A-Z0-9]+")}`).test(n),
     );
     if (achou) out.push({ coluna: col, motivo: `${achou.rotulo} — ${AVISO_CAMPO_SENSIVEL}` });
   }
