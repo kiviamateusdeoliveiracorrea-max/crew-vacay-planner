@@ -1029,6 +1029,11 @@ function ImportarPage() {
                             ) : (
                               <span className="text-emerald-600 dark:text-emerald-400">Válida</span>
                             )}
+                            {l.avisos.length ? (
+                              <span className="mt-1 block text-amber-600 dark:text-amber-400">
+                                {l.avisos.join("; ")}
+                              </span>
+                            ) : null}
                           </td>
                         </tr>
                       );
