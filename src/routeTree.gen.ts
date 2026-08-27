@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as AuditoriaRouteImport } from './routes/auditoria'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ChamadaRouteImport } from './routes/chamada'
 import { Route as FeriasRouteImport } from './routes/ferias'
 import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as MovimentacoesRouteImport } from './routes/movimentacoes'
@@ -37,6 +38,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ChamadaRoute = ChamadaRouteImport.update({
+  id: '/chamada',
+  path: '/chamada',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FeriasRoute = FeriasRouteImport.update({
   id: '/ferias',
   path: '/ferias',
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/auditoria': typeof AuditoriaRoute
   '/auth': typeof AuthRoute
+  '/chamada': typeof ChamadaRoute
   '/ferias': typeof FeriasRoute
   '/importar': typeof ImportarRoute
   '/movimentacoes': typeof MovimentacoesRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/auditoria': typeof AuditoriaRoute
   '/auth': typeof AuthRoute
+  '/chamada': typeof ChamadaRoute
   '/ferias': typeof FeriasRoute
   '/importar': typeof ImportarRoute
   '/movimentacoes': typeof MovimentacoesRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/auditoria': typeof AuditoriaRoute
   '/auth': typeof AuthRoute
+  '/chamada': typeof ChamadaRoute
   '/ferias': typeof FeriasRoute
   '/importar': typeof ImportarRoute
   '/movimentacoes': typeof MovimentacoesRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auditoria'
     | '/auth'
+    | '/chamada'
     | '/ferias'
     | '/importar'
     | '/movimentacoes'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auditoria'
     | '/auth'
+    | '/chamada'
     | '/ferias'
     | '/importar'
     | '/movimentacoes'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auditoria'
     | '/auth'
+    | '/chamada'
     | '/ferias'
     | '/importar'
     | '/movimentacoes'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   AuditoriaRoute: typeof AuditoriaRoute
   AuthRoute: typeof AuthRoute
+  ChamadaRoute: typeof ChamadaRoute
   FeriasRoute: typeof FeriasRoute
   ImportarRoute: typeof ImportarRoute
   MovimentacoesRoute: typeof MovimentacoesRoute
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/chamada': {
+      id: '/chamada'
+      path: '/chamada'
+      fullPath: '/chamada'
+      preLoaderRoute: typeof ChamadaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ferias': {
       id: '/ferias'
       path: '/ferias'
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   AuditoriaRoute: AuditoriaRoute,
   AuthRoute: AuthRoute,
+  ChamadaRoute: ChamadaRoute,
   FeriasRoute: FeriasRoute,
   ImportarRoute: ImportarRoute,
   MovimentacoesRoute: MovimentacoesRoute,

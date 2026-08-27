@@ -13,7 +13,8 @@ const LINKS = [
   { to: "/", label: "Painel" },
   { to: "/ferias", label: "Férias" },
   { to: "/movimentacoes", label: "Movimentações" },
-  { to: "/importar", label: "Importar base", cadastro: true },
+  { to: "/chamada", label: "Chamada Diária" },
+
   { to: "/auditoria", label: "Auditoria", admin: true },
   { to: "/admin", label: "Usuários e Acessos", admin: true },
 ] as const;
