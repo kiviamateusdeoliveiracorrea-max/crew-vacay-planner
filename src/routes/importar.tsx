@@ -59,6 +59,15 @@ import {
   type LinhaImportada,
   type Mapeamento,
 } from "@/lib/importacao";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MODELOS, VERSAO_MODELO, baixarModelo } from "@/lib/modelo-importacao";
 import { humaniza, normaliza } from "@/lib/sistema";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
