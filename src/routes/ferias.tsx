@@ -1,3 +1,5 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
+import { rotularCodigo } from "@/lib/mensagens";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -22,7 +24,6 @@ import { severidadeMax } from "@/lib/conflitos";
 import {
   diasEntre,
   fmtData,
-  humaniza,
   severidadeClasse,
   SEVERIDADE_LABEL,
 } from "@/lib/sistema";
@@ -57,6 +58,7 @@ function FeriasPage() {
   const fer = useVacations();
   const mov = useMovements();
   const perfil = usePerfil();
+  const avisarErro = useAvisoErro();
   const excluir = useExcluirFerias();
   const reconhecer = useReconhecerConflito();
 
@@ -185,7 +187,7 @@ function FeriasPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px]">
-                          {humaniza(v.status)}
+                          {rotularCodigo(v.status)}
                         </Badge>
                         {sev && (
                           <span
@@ -213,9 +215,7 @@ function FeriasPage() {
                                 await excluir.mutateAsync(v.id);
                                 toast.success("Registro excluído.");
                               } catch (e) {
-                                toast.error(
-                                  e instanceof Error ? e.message : "Não foi possível excluir.",
-                                );
+                                avisarErro(e, "Não foi possível excluir o registro. Tente novamente.");
                               }
                             }}
                           >

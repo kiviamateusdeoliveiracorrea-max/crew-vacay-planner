@@ -1,3 +1,5 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
+import { rotularCodigo } from "@/lib/mensagens";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
@@ -68,7 +70,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MODELOS, VERSAO_MODELO, baixarModelo } from "@/lib/modelo-importacao";
-import { humaniza, normaliza } from "@/lib/sistema";
+import { normaliza } from "@/lib/sistema";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
 export const Route = createFileRoute("/importar")({
@@ -105,6 +107,7 @@ function ImportarPage() {
   const cat = useCatalogos();
   const emp = useEmployees();
   const perfil = usePerfil();
+  const avisarErro = useAvisoErro();
   const { user } = useAuth();
   const qc = useQueryClient();
 
@@ -195,7 +198,7 @@ function ImportarPage() {
     if (!catOk) return;
     const faltando = campos.filter((c) => c.obrigatorio && !mapeamento[c.key as CampoKey]);
     if (faltando.length) {
-      toast.error(`Mapeie: ${faltando.map((f) => f.label).join(", ")}`);
+      toast.error(`Revise o mapeamento: informe a coluna de ${faltando.map((f) => f.label).join(", ")}.`);
       return;
     }
     const resultadoAnalise = classificar(
@@ -350,7 +353,7 @@ function ImportarPage() {
       .select("id, nome, fonte, mapeamento")
       .single();
     if (error || !data) {
-      toast.error(error?.message ?? "Falha ao salvar o modelo.");
+      avisarErro(error, "Não foi possível salvar o modelo de mapeamento. Tente novamente.");
       return;
     }
     setModelos((m) => [
@@ -609,7 +612,7 @@ function ImportarPage() {
       setAnalisado(null);
       setDecisoes({});
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao aplicar importação.");
+      avisarErro(e, "Não foi possível processar as alterações aprovadas. Nada foi gravado. Tente novamente.");
     } finally {
       setAplicando(false);
     }
@@ -659,7 +662,7 @@ function ImportarPage() {
                       });
                       toast.success(`Modelo gerado: ${nome}`);
                     } catch (e) {
-                      toast.error(e instanceof Error ? e.message : "Falha ao gerar o modelo.");
+                      avisarErro(e, "Não foi possível gerar o modelo de importação. Tente novamente.");
                     }
                   }}
                 >
@@ -818,7 +821,7 @@ function ImportarPage() {
                     <SelectContent>
                       {modelos.map((m) => (
                         <SelectItem key={m.id} value={m.id}>
-                          {m.nome} · {humaniza(m.fonte)}
+                          {m.nome} · {rotularCodigo(m.fonte)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -904,7 +907,7 @@ function ImportarPage() {
                     onClick={() => setFClasse(fClasse === k ? TODAS : k)}
                     className={`rounded px-2 py-1 text-xs ${CLASSE_COR[k as keyof typeof CLASSE_COR]} ${fClasse === k ? "ring-2 ring-ring" : ""}`}
                   >
-                    {humaniza(k)}: {v}
+                    {rotularCodigo(k)}: {v}
                   </button>
                 ))}
               </div>
@@ -937,7 +940,7 @@ function ImportarPage() {
                         <SelectItem value={TODAS}>Todos</SelectItem>
                         {f.itens.map((i) => (
                           <SelectItem key={i} value={i}>
-                            {humaniza(i)}
+                            {rotularCodigo(i)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -973,11 +976,11 @@ function ImportarPage() {
                             <span
                               className={`rounded px-1.5 py-0.5 ${CLASSE_COR[l.classificacao]}`}
                             >
-                              {humaniza(l.classificacao)}
+                              {rotularCodigo(l.classificacao)}
                             </span>
                           </td>
                           <td className="p-2 text-muted-foreground">
-                            {difs.map(([c]) => humaniza(c)).join(", ") || "—"}
+                            {difs.map(([c]) => rotularCodigo(c)).join(", ") || "—"}
                           </td>
                           <td className="p-2 text-muted-foreground">
                             {difs.map(([, d]) => d.de ?? "—").join(", ") || "—"}

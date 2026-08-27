@@ -1,3 +1,4 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
@@ -43,6 +44,7 @@ type Rascunho = { papeis: Papel[]; unidades: string[]; areas: string[]; ativo: b
 
 function AdminPage() {
   const perfil = usePerfil();
+  const avisarErro = useAvisoErro();
   const cat = useCatalogos();
   const ehAdmin = perfil.tem("ADMIN");
   const usuarios = useUsuariosAcesso(ehAdmin);
@@ -103,7 +105,7 @@ function AdminPage() {
             return resto;
           });
         },
-        onError: (e) => toast.error((e as Error).message),
+        onError: (e) => avisarErro(e, "Não foi possível concluir a alteração de acesso. Tente novamente."),
       },
     );
   }
@@ -239,7 +241,7 @@ function AdminPage() {
                     { userId: u.id },
                     {
                       onSuccess: () => toast.success("Solicitação recusada."),
-                      onError: (e) => toast.error((e as Error).message),
+                      onError: (e) => avisarErro(e, "Não foi possível concluir a alteração de acesso. Tente novamente."),
                     },
                   )
                 }
@@ -257,7 +259,7 @@ function AdminPage() {
                 if (!confirm(`Remover todo o acesso de ${u.email ?? u.id}?`)) return;
                 remover.mutate(u.id, {
                   onSuccess: () => toast.success("Acesso removido."),
-                  onError: (e) => toast.error((e as Error).message),
+                  onError: (e) => avisarErro(e, "Não foi possível concluir a alteração de acesso. Tente novamente."),
                 });
               }}
             >

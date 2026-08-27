@@ -1,3 +1,4 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ export function SolicitarAcesso() {
   const enviar = useSolicitarAcesso();
 
   const [areaId, setAreaId] = useState<string>("");
+  const avisarErro = useAvisoErro();
   const [justificativa, setJustificativa] = useState("");
 
   const email = minha.data?.email ?? null;
@@ -114,7 +116,7 @@ export function SolicitarAcesso() {
                     setAreaId("");
                     toast.success("Solicitação enviada. Aguarde a aprovação de um administrador.");
                   },
-                  onError: (e) => toast.error((e as Error).message),
+                  onError: (e) => avisarErro(e, "Não foi possível enviar sua solicitação. Tente novamente."),
                 },
               )
             }

@@ -1,3 +1,4 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -86,6 +87,7 @@ async function todas<T>(
 
 function RelatoriosPage() {
   const perfil = usePerfil();
+  const avisarErro = useAvisoErro();
   const { user } = useAuth();
   const cat = useCatalogos();
   const [rel, setRel] = useState<RelatorioId>("COLABORADORES");
@@ -254,7 +256,7 @@ function RelatoriosPage() {
       setPct(100);
       toast.success(`${nome}: ${total} registro(s) exportado(s) em ${formato}.`);
     } catch (e) {
-      toast.error(`Falha ao exportar: ${e instanceof Error ? e.message : "erro inesperado"}`);
+      avisarErro(e, "Não foi possível gerar a exportação. Tente novamente.");
     } finally {
       setOcupado(false);
       setPasso("");

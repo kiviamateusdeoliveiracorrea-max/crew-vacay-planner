@@ -1,3 +1,4 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/AppShell";
@@ -75,6 +76,7 @@ const TODOS = "__todos__";
 
 function Painel() {
   const perfil = usePerfil();
+  const avisarErro = useAvisoErro();
   const { user } = useAuth();
   const cat = useCatalogos();
   const emp = useEmployees();
@@ -397,7 +399,7 @@ function Painel() {
       });
       toast.success(`${d.indicador}: ${total} registro(s) exportado(s) em ${formato}.`);
     } catch (e) {
-      toast.error(`Falha ao exportar: ${e instanceof Error ? e.message : "erro inesperado"}`);
+      avisarErro(e, "Não foi possível gerar a exportação. Tente novamente.");
     } finally {
       setExportando(false);
     }

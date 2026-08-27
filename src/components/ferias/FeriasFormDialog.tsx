@@ -1,3 +1,4 @@
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { useEffect, useMemo, useState } from "react";
 import {
   Dialog,
@@ -61,6 +62,7 @@ export function FeriasFormDialog({
 
   const salvar = useSalvarFerias();
   const [employeeId, setEmployeeId] = useState("");
+  const avisarErro = useAvisoErro();
   const [inicio, setInicio] = useState("");
   const [fim, setFim] = useState("");
   const [status, setStatus] = useState<Vacation["status"]>("PLANEJADA");
@@ -132,7 +134,7 @@ export function FeriasFormDialog({
 
   async function submeter() {
     if (!employeeId || !inicio || !fim) {
-      toast.error("Informe colaborador, início e fim.");
+      toast.error("Revise os campos destacados: informe o colaborador, a data de início e a data de fim.");
       return;
     }
     if (fim < inicio) {
@@ -155,7 +157,7 @@ export function FeriasFormDialog({
       toast.success("Férias salvas. Conflitos recalculados.");
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível salvar.");
+      avisarErro(e, "Não foi possível salvar as férias. Tente novamente.");
     }
   }
 
