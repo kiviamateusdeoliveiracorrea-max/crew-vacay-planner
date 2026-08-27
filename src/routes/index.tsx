@@ -228,6 +228,99 @@ function Painel() {
 
   const carregando = cat.isLoading || fer.isLoading || mov.isLoading || emp.isLoading;
 
+  /* ------------------------------------------------- exportação dos indicadores */
+
+  const ctx = useMemo(
+    () =>
+      ctxPainel(
+        {
+          areas: areas.map((a) => ({ id: a.id, nome: a.nome, unit_id: a.unit_id })),
+          turnos: turnos.map((t) => ({ id: t.id, nome: t.nome })),
+          funcoes: funcoes.map((f) => ({ id: f.id, nome: f.nome, funcao_chave: f.funcao_chave })),
+          unidades: (cat.data?.unidades ?? []).map((u) => ({ id: u.id, nome: u.nome })),
+        },
+        (mov.data ?? []) as never,
+        perfil.tem("ADMIN") || perfil.tem("ANALISTA") ? null : perfil.areasPermitidas,
+      ),
+    [areas, turnos, funcoes, cat.data, mov.data, perfil.papeis, perfil.areasPermitidas],
+  );
+
+  const filtrosAtivos = useMemo(
+    () =>
+      filtrosDoPainel({
+        unidade: unidade === TODOS ? "" : unidade,
+        area: areaId === TODOS ? "" : areaId,
+        turno: shiftId === TODOS ? "" : shiftId,
+        funcao: functionId === TODOS ? "" : functionId,
+        mes,
+        status: status === TODOS ? "" : status,
+        criticidade: criticidade === TODOS ? "" : criticidade,
+      }),
+    [unidade, areaId, shiftId, functionId, mes, status, criticidade],
+  );
+
+  const rotulosFiltros = useMemo(
+    () => ({
+      unidade: unidade === TODOS ? undefined : unidade,
+      area: areaId === TODOS ? undefined : nomeArea(areaId),
+      turno: shiftId === TODOS ? undefined : nomeTurno(shiftId),
+      funcao: functionId === TODOS ? undefined : nomeFuncao(functionId),
+    }),
+    [unidade, areaId, shiftId, functionId, areas, turnos, funcoes],
+  );
+
+  const tFerias = (itens: VacationFull[]) => tabelaFeriasPainel(ctx, itens as never);
+  const tMov = (itens: MovementFull[]) => tabelaMovPainel(ctx, itens as never);
+
+  const empsFiltrados = useMemo(() => {
+    const idsArea = new Set(areasVisiveis.map((a) => a.id));
+    return employees.filter((e) => {
+      if (e.status !== "ATIVO") return false;
+      if (!idsArea.has(e.area_id ?? "")) return false;
+      if (areaId !== TODOS && e.area_id !== areaId) return false;
+      if (shiftId !== TODOS && e.shift_id !== shiftId) return false;
+      if (functionId !== TODOS && e.function_id !== functionId) return false;
+      return true;
+    });
+  }, [employees, areasVisiveis, areaId, shiftId, functionId]);
+
+  const aVencer = useMemo(
+    () => tabelaAVencerPainel(ctx, empsFiltrados as never, ativas as never),
+    [ctx, empsFiltrados, fer.data, areasVisiveis, areaId, shiftId, functionId, status, mes, criticidade],
+  );
+
+  const emailUsuario = user?.email ?? "usuário autenticado";
+
+  async function exportar(d: NonNullable<Drilldown>, formato: "XLSX" | "CSV") {
+    if (exportando) return;
+    const tabelas: Tabela[] = [d.tabela, ...(d.extras ?? [])];
+    const total = tabelas.reduce((s, t) => s + t.linhas.length, 0);
+    if (total === 0) {
+      toast.info("Nenhum registro para os filtros aplicados.");
+      return;
+    }
+    setExportando(true);
+    try {
+      const params = parametrosPainel(d.indicador, filtrosAtivos, emailUsuario, rotulosFiltros);
+      const nome = `Painel — ${d.indicador}`;
+      if (formato === "XLSX") exportarXlsx(tabelas, params, nome);
+      else exportarCsvComCabecalho(tabelas[0]!, params, nome);
+      await registrarExportacao({
+        data: {
+          relatorio: `PAINEL_${d.indicador.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`,
+          formato,
+          filtros: Object.fromEntries(Object.entries(filtrosAtivos).filter(([, v]) => v)),
+          totais: Object.fromEntries(tabelas.map((t) => [t.nome, t.linhas.length])),
+        },
+      });
+      toast.success(`${d.indicador}: ${total} registro(s) exportado(s) em ${formato}.`);
+    } catch (e) {
+      toast.error(`Falha ao exportar: ${e instanceof Error ? e.message : "erro inesperado"}`);
+    } finally {
+      setExportando(false);
+    }
+  }
+
   const indicadores: { titulo: string; valor: number; tom?: string; drill: Drilldown }[] = [
     { titulo: "Férias no filtro", valor: ativas.length, drill: { titulo: "Férias no filtro", tipo: "ferias", itens: ativas } },
     {
