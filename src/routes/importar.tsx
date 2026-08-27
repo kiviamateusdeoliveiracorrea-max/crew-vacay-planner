@@ -59,6 +59,15 @@ import {
   type LinhaImportada,
   type Mapeamento,
 } from "@/lib/importacao";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { MODELOS, VERSAO_MODELO, baixarModelo } from "@/lib/modelo-importacao";
 import { humaniza, normaliza } from "@/lib/sistema";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 
@@ -621,12 +630,44 @@ function ImportarPage() {
   return (
     <AppShell>
       <div className="space-y-4">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Importar base</h1>
-          <p className="text-sm text-muted-foreground">
-            Compare a extração recebida com a base atual antes de aplicar. Nada é gravado até a
-            confirmação final; ausência no arquivo nunca desliga ninguém.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">Importar base</h1>
+            <p className="text-sm text-muted-foreground">
+              Compare a extração recebida com a base atual antes de aplicar. Nada é gravado até a
+              confirmação final; ausência no arquivo nunca desliga ninguém.
+            </p>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                Baixar modelo de importação
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-72">
+              <DropdownMenuLabel>Modelos padronizados (v{VERSAO_MODELO})</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {MODELOS.map((m) => (
+                <DropdownMenuItem
+                  key={m.key}
+                  onSelect={() => {
+                    try {
+                      const nome = baixarModelo(m.key, {
+                        areas: cat.data?.areas.map((a) => a.nome) ?? [],
+                        turnos: cat.data?.turnos.map((t) => t.nome) ?? [],
+                        funcoes: cat.data?.funcoes.map((f) => f.nome) ?? [],
+                      });
+                      toast.success(`Modelo gerado: ${nome}`);
+                    } catch (e) {
+                      toast.error(e instanceof Error ? e.message : "Falha ao gerar o modelo.");
+                    }
+                  }}
+                >
+                  {m.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         <Card>
