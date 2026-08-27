@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Download, FileSpreadsheet } from "lucide-react";
 import type { Tabela } from "@/lib/relatorios";
 
-type Base = { titulo: string; indicador: string; tabela: Tabela };
+type Base = { titulo: string; indicador: string; tabela: Tabela; extras?: Tabela[] };
 
 export type Drilldown =
   | (Base & { tipo: "ferias"; itens: VacationFull[] })
