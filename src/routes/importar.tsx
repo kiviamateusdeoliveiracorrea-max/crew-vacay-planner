@@ -200,11 +200,26 @@ function ImportarPage() {
     );
     setAnalisado(resultadoAnalise);
     setResultado(null);
+    const areaNome = new Map(cat.data!.areas.map((a) => [a.id, a.nome]));
+    const turnoNome = new Map(cat.data!.turnos.map((t) => [t.id, t.nome]));
     setDecisoes(
       Object.fromEntries(
         resultadoAnalise
           .filter((l) => l.classificacao === "MUDANCA_DE_SETOR")
-          .map((l) => [l.linha, { tipo: "DEFINITIVA", inicio: hoje(), fim: "" } as DecisaoSetor]),
+          .map((l) => {
+            const atual = emp.data!.find((e) => e.id === l.employee_id);
+            const dec: DecisaoSetor = {
+              tipo: "DEFINITIVA",
+              inicio: hoje(),
+              fim: "",
+              areaOrigem: areaNome.get(atual?.area_id ?? "") ?? null,
+              areaDestino: l.dados["area"] || null,
+              turnoOrigem: turnoNome.get(atual?.shift_id ?? "") ?? null,
+              turnoDestino: l.dados["turno"] || turnoNome.get(atual?.shift_id ?? "") || null,
+              justificativa: "",
+            };
+            return [l.linha, dec];
+          }),
       ),
     );
     toast.success(
