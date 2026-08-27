@@ -92,8 +92,10 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const email = session.user.email ?? "";
   const nome =
-    (session.user.user_metadata?.full_name as string | undefined) ?? email.split("@")[0] ?? "Usuário";
-  const primeiroNome = nome.split(/[.\s]/)[0];
+    (session.user.user_metadata?.["full_name"] as string | undefined) ||
+    email.split("@")[0] ||
+    "Usuário";
+  const primeiroNome = nome.split(/[.\s]/)[0] || nome;
   const iniciais = primeiroNome.slice(0, 2).toUpperCase();
 
   const navItems = (
