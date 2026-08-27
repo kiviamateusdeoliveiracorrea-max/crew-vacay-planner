@@ -263,6 +263,20 @@ function ImportarPage() {
     );
   }
 
+  /** Atualiza parte da decisão de setor sem perder os demais campos. */
+  function ajustarDecisao(linha: number, patch: Partial<DecisaoSetor>) {
+    setDecisoes((prev) => ({
+      ...prev,
+      [linha]: {
+        tipo: "DEFINITIVA",
+        inicio: hoje(),
+        fim: "",
+        ...(prev[linha] ?? {}),
+        ...patch,
+      },
+    }));
+  }
+
   function aprovarValidas() {
     setAnalisado((prev) =>
       (prev ?? []).map((l) =>
