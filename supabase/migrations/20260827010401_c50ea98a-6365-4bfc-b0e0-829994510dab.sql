@@ -1,0 +1,1 @@
+revoke execute on function public.prevent_physical_delete() from public, anon, authenticated;
