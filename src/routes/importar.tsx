@@ -530,13 +530,31 @@ function ImportarPage() {
             continue;
           }
           const temporaria = decisao.tipo !== "DEFINITIVA";
+          // Nas temporárias vale exatamente o que o usuário confirmou na comparação.
+          const origemArea = temporaria
+            ? ((await garantir("areas", areas, decisao.areaOrigem ?? "")) ?? atual?.area_id ?? null)
+            : (atual?.area_id ?? null);
+          const destinoArea = temporaria
+            ? ((await garantir("areas", areas, decisao.areaDestino ?? "")) ?? areaId)
+            : areaId;
+          const origemTurno = temporaria
+            ? ((await garantir("shifts", turnos, decisao.turnoOrigem ?? "")) ??
+              atual?.shift_id ??
+              null)
+            : (atual?.shift_id ?? null);
+          const destinoTurno = temporaria
+            ? ((await garantir("shifts", turnos, decisao.turnoDestino ?? "")) ??
+              turnoId ??
+              atual?.shift_id ??
+              null)
+            : (turnoId ?? atual?.shift_id ?? null);
           const { error } = await supabase.from("employee_movements").insert({
             employee_id: l.employee_id,
             re: d["re"]!,
-            area_origem_id: atual?.area_id ?? null,
-            area_destino_id: areaId,
-            shift_origem_id: atual?.shift_id ?? null,
-            shift_destino_id: turnoId ?? atual?.shift_id ?? null,
+            area_origem_id: origemArea,
+            area_destino_id: destinoArea,
+            shift_origem_id: origemTurno,
+            shift_destino_id: destinoTurno,
             data_efetiva: decisao.inicio || hoje(),
             tipo:
               decisao.tipo === "DEFINITIVA"
@@ -546,7 +564,10 @@ function ImportarPage() {
                   : "EMPRESTIMO_TEMPORARIO",
             temporaria,
             data_fim: temporaria ? decisao.fim : null,
-            motivo: l.justificativa || `Importação ${arquivo?.nome ?? ""}`,
+            motivo:
+              (temporaria ? decisao.justificativa : "") ||
+              l.justificativa ||
+              `Importação ${arquivo?.nome ?? ""}`,
             status: "PENDENTE",
             created_by: user?.id ?? null,
           });
