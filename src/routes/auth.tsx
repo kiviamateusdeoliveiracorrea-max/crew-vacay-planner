@@ -71,55 +71,97 @@ function AuthPage() {
     navigate({ to: "/", replace: true });
   }
 
+  async function recuperar() {
+    if (!email) {
+      toast.error("Informe o e-mail corporativo para receber o link de recuperação.");
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+    if (error) {
+      toast.error("Não foi possível enviar o link de recuperação.");
+      return;
+    }
+    toast.success("Se o e-mail estiver cadastrado, enviaremos um link de recuperação.");
+  }
+
   return (
-    <main className="flex min-h-screen items-center justify-center bg-secondary px-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="mb-2 flex justify-center">
-            <img
-              src={intralogLogoAsset.url}
-              alt="Intralog"
-              className="h-10 w-auto object-contain"
-            />
-          </div>
-          <CardTitle className="text-2xl">Gestão de Férias</CardTitle>
-          <CardDescription>
-            Acesso corporativo da Intralog. Entre para lançar e conferir férias, presença e movimentações.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail corporativo</Label>
-              <Input id="email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="senha">Senha</Label>
-              <Input
-                id="senha"
-                type="password"
-                required
-                minLength={6}
-                value={senha}
-                onChange={(e) => setSenha(e.target.value)}
+    <main className="flex min-h-screen items-center justify-center bg-secondary px-4 py-10">
+      <div className="w-full max-w-md">
+        <Card className="shadow-[var(--shadow-card)]">
+          <CardHeader className="text-center">
+            <div className="mb-3 flex justify-center">
+              <img
+                src={intralogLogoAsset.url}
+                alt="Intralog"
+                width={2048}
+                height={561}
+                className="h-11 w-auto object-contain p-0.5"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={busy}>
-              {modo === "entrar" ? "Entrar" : "Criar conta"}
+            <CardTitle className="text-xl leading-snug">{APP_NOME}</CardTitle>
+            <CardDescription>{APP_SUBTITULO}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <form onSubmit={submit} className="space-y-4" noValidate={false}>
+              <div className="space-y-2">
+                <Label htmlFor="email">
+                  E-mail corporativo <span aria-hidden className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="senha">
+                  Senha <span aria-hidden className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="senha"
+                  type="password"
+                  autoComplete={modo === "entrar" ? "current-password" : "new-password"}
+                  required
+                  minLength={6}
+                  value={senha}
+                  onChange={(e) => setSenha(e.target.value)}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={busy}>
+                {busy ? "Validando…" : modo === "entrar" ? "Entrar" : "Criar conta"}
+              </Button>
+            </form>
+            <Button variant="outline" className="w-full" onClick={google}>
+              Entrar com Google
             </Button>
-          </form>
-          <Button variant="outline" className="w-full" onClick={google}>
-            Entrar com Google
-          </Button>
-          <button
-            type="button"
-            className="w-full text-sm text-muted-foreground underline-offset-4 hover:underline"
-            onClick={() => setModo(modo === "entrar" ? "criar" : "entrar")}
-          >
-            {modo === "entrar" ? "Não tem acesso? Criar conta" : "Já tenho conta, entrar"}
-          </button>
-        </CardContent>
-      </Card>
+            <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+              <button
+                type="button"
+                className="text-muted-foreground underline-offset-4 hover:underline"
+                onClick={() => setModo(modo === "entrar" ? "criar" : "entrar")}
+              >
+                {modo === "entrar" ? "Não tem acesso? Criar conta" : "Já tenho conta, entrar"}
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground underline-offset-4 hover:underline"
+                onClick={recuperar}
+              >
+                Recuperar acesso
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+        <p className="mt-4 rounded-md border border-border bg-card p-3 text-center text-xs leading-relaxed text-muted-foreground">
+          Acesso destinado a usuários autorizados. As ações realizadas no sistema podem ser
+          registradas para fins de segurança e auditoria.
+        </p>
+      </div>
     </main>
   );
 }
