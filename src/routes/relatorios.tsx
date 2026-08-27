@@ -226,12 +226,16 @@ function RelatoriosPage() {
         return;
       }
       const nome = RELATORIOS.find((r) => r.id === rel)!.nome;
-      const rotulos = {
-        unidade: cat.data.unidades.find((u) => u.id === f.unidade)?.nome,
-        area: cat.data.areas.find((a) => a.id === f.area)?.nome,
-        turno: cat.data.turnos.find((t) => t.id === f.turno)?.nome,
-        funcao: cat.data.funcoes.find((x) => x.id === f.funcao)?.nome,
-      };
+      const rotulos: Partial<Record<keyof Filtros, string>> = {};
+      const unidadeNome = cat.data.unidades.find((u) => u.id === f.unidade)?.nome;
+      const areaRotulo = cat.data.areas.find((a) => a.id === f.area)?.nome;
+      const turnoRotulo = cat.data.turnos.find((t) => t.id === f.turno)?.nome;
+      const funcaoRotulo = cat.data.funcoes.find((x) => x.id === f.funcao)?.nome;
+      if (unidadeNome) rotulos.unidade = unidadeNome;
+      if (areaRotulo) rotulos.area = areaRotulo;
+      if (turnoRotulo) rotulos.turno = turnoRotulo;
+      if (funcaoRotulo) rotulos.funcao = funcaoRotulo;
+
       if (formato === "XLSX") {
         exportarXlsx(tabelas, parametros(nome, f, emailUsuario, rotulos), nome);
       } else {
