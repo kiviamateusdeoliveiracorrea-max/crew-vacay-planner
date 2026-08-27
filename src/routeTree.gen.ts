@@ -17,6 +17,7 @@ import { Route as ChamadaRouteImport } from './routes/chamada'
 import { Route as FeriasRouteImport } from './routes/ferias'
 import { Route as ImportarRouteImport } from './routes/importar'
 import { Route as MovimentacoesRouteImport } from './routes/movimentacoes'
+import { Route as RecuperarSenhaRouteImport } from './routes/recuperar-senha'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 
 const IndexRoute = IndexRouteImport.update({
@@ -59,6 +60,11 @@ const MovimentacoesRoute = MovimentacoesRouteImport.update({
   path: '/movimentacoes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RecuperarSenhaRoute = RecuperarSenhaRouteImport.update({
+  id: '/recuperar-senha',
+  path: '/recuperar-senha',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RelatoriosRoute = RelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
@@ -74,6 +80,7 @@ export interface FileRoutesByFullPath {
   '/ferias': typeof FeriasRoute
   '/importar': typeof ImportarRoute
   '/movimentacoes': typeof MovimentacoesRoute
+  '/recuperar-senha': typeof RecuperarSenhaRoute
   '/relatorios': typeof RelatoriosRoute
 }
 export interface FileRoutesByTo {
@@ -85,6 +92,7 @@ export interface FileRoutesByTo {
   '/ferias': typeof FeriasRoute
   '/importar': typeof ImportarRoute
   '/movimentacoes': typeof MovimentacoesRoute
+  '/recuperar-senha': typeof RecuperarSenhaRoute
   '/relatorios': typeof RelatoriosRoute
 }
 export interface FileRoutesById {
@@ -97,6 +105,7 @@ export interface FileRoutesById {
   '/ferias': typeof FeriasRoute
   '/importar': typeof ImportarRoute
   '/movimentacoes': typeof MovimentacoesRoute
+  '/recuperar-senha': typeof RecuperarSenhaRoute
   '/relatorios': typeof RelatoriosRoute
 }
 export interface FileRouteTypes {
@@ -110,6 +119,7 @@ export interface FileRouteTypes {
     | '/ferias'
     | '/importar'
     | '/movimentacoes'
+    | '/recuperar-senha'
     | '/relatorios'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -121,6 +131,7 @@ export interface FileRouteTypes {
     | '/ferias'
     | '/importar'
     | '/movimentacoes'
+    | '/recuperar-senha'
     | '/relatorios'
   id:
     | '__root__'
@@ -132,6 +143,7 @@ export interface FileRouteTypes {
     | '/ferias'
     | '/importar'
     | '/movimentacoes'
+    | '/recuperar-senha'
     | '/relatorios'
   fileRoutesById: FileRoutesById
 }
@@ -144,6 +156,7 @@ export interface RootRouteChildren {
   FeriasRoute: typeof FeriasRoute
   ImportarRoute: typeof ImportarRoute
   MovimentacoesRoute: typeof MovimentacoesRoute
+  RecuperarSenhaRoute: typeof RecuperarSenhaRoute
   RelatoriosRoute: typeof RelatoriosRoute
 }
 
@@ -205,6 +218,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MovimentacoesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/recuperar-senha': {
+      id: '/recuperar-senha'
+      path: '/recuperar-senha'
+      fullPath: '/recuperar-senha'
+      preLoaderRoute: typeof RecuperarSenhaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/relatorios': {
       id: '/relatorios'
       path: '/relatorios'
@@ -224,6 +244,7 @@ const rootRouteChildren: RootRouteChildren = {
   FeriasRoute: FeriasRoute,
   ImportarRoute: ImportarRoute,
   MovimentacoesRoute: MovimentacoesRoute,
+  RecuperarSenhaRoute: RecuperarSenhaRoute,
   RelatoriosRoute: RelatoriosRoute,
 }
 export const routeTree = rootRouteImport
