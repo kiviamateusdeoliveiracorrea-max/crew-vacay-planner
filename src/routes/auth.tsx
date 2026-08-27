@@ -13,10 +13,10 @@ import intralogLogoAsset from "@/assets/intralog-logo.png.asset.json";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Entrar | Controle de Férias" },
-      { name: "description", content: "Acesse o painel de controle de férias por área e função da operação." },
-      { property: "og:title", content: "Entrar | Controle de Férias" },
-      { property: "og:description", content: "Acesse o painel de controle de férias da operação." },
+      { title: "Entrar | Intralog Gestão de Férias" },
+      { name: "description", content: "Acesse o painel gerencial de férias, presença e movimentações da Intralog." },
+      { property: "og:title", content: "Entrar | Intralog Gestão de Férias" },
+      { property: "og:description", content: "Acesse o painel gerencial de férias, presença e movimentações da Intralog." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
