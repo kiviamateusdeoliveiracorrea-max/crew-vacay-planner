@@ -1139,7 +1139,9 @@ function ImportarPage() {
                   onClick={() => setConfirmando(true)}
                   disabled={aplicando || aprovadas.length === 0 || decisaoInvalida}
                 >
-                  {aplicando ? "Processando…" : `Processar aprovadas (${aprovadas.length})`}
+                  {aplicando
+                    ? "Processando…"
+                    : `Processar alterações aprovadas (${aprovadas.length})`}
                 </Button>
                 <Button variant="ghost" onClick={cancelarLote} disabled={aplicando}>
                   Cancelar lote
