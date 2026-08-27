@@ -16,16 +16,24 @@ import {
 } from "@/lib/sistema";
 import { severidadeMax } from "@/lib/conflitos";
 import type { RegistroFoco } from "@/components/painel/RegistroDialog";
+import { Button } from "@/components/ui/button";
+import { Download, FileSpreadsheet } from "lucide-react";
+import type { Tabela } from "@/lib/relatorios";
+
+type Base = { titulo: string; indicador: string; tabela: Tabela };
 
 export type Drilldown =
-  | { titulo: string; tipo: "ferias"; itens: VacationFull[] }
-  | { titulo: string; tipo: "movimentacoes"; itens: MovementFull[] }
+  | (Base & { tipo: "ferias"; itens: VacationFull[] })
+  | (Base & { tipo: "movimentacoes"; itens: MovementFull[] })
+  | (Base & { tipo: "tabela" })
   | null;
 
 export function DrilldownDialog({
   data,
   onClose,
   onAbrirRegistro,
+  onExportar,
+  exportando,
   nomeArea,
   nomeTurno,
   nomeFuncao,
@@ -33,6 +41,8 @@ export function DrilldownDialog({
   data: Drilldown;
   onClose: () => void;
   onAbrirRegistro: (r: RegistroFoco) => void;
+  onExportar: (d: NonNullable<Drilldown>, formato: "XLSX" | "CSV") => void;
+  exportando: boolean;
   nomeArea: (id: string | null) => string;
   nomeTurno: (id: string | null) => string;
   nomeFuncao: (id: string | null) => string;
@@ -44,10 +54,66 @@ export function DrilldownDialog({
           <DialogTitle>{data?.titulo}</DialogTitle>
           <DialogDescription>
             {data
-              ? `${data.itens.length} registro(s) compõem este indicador. Clique em um item para abrir o registro de origem e a trilha de auditoria.`
+              ? `${data.tabela.linhas.length} registro(s) compõem este indicador. Clique em um item para abrir o registro de origem e a trilha de auditoria.`
               : ""}
           </DialogDescription>
         </DialogHeader>
+
+        {data && (
+          <div className="flex flex-wrap gap-2 border-b border-border pb-3">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={exportando}
+              onClick={() => onExportar(data, "XLSX")}
+            >
+              <FileSpreadsheet className="mr-1.5 h-4 w-4" /> Exportar Excel
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={exportando}
+              onClick={() => onExportar(data, "CSV")}
+            >
+              <Download className="mr-1.5 h-4 w-4" /> Exportar CSV
+            </Button>
+            <span className="self-center text-xs text-muted-foreground">
+              A exportação respeita os filtros ativos do painel.
+            </span>
+          </div>
+        )}
+
+        {data?.tipo === "tabela" && (
+          <div className="overflow-x-auto">
+            {data.tabela.linhas.length === 0 && (
+              <p className="text-sm text-muted-foreground">Nenhum registro.</p>
+            )}
+            {data.tabela.linhas.length > 0 && (
+              <table className="w-full text-sm">
+                <thead className="text-xs uppercase text-muted-foreground">
+                  <tr className="border-b border-border">
+                    {data.tabela.colunas.map((c) => (
+                      <th key={c} className="whitespace-nowrap py-2 pr-3 text-left font-medium">
+                        {c}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.tabela.linhas.map((l, i) => (
+                    <tr key={i} className="border-b border-border/60">
+                      {l.map((v, j) => (
+                        <td key={j} className="whitespace-nowrap py-1.5 pr-3">
+                          {v}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
 
         {data?.tipo === "ferias" && (
           <div className="space-y-2">
