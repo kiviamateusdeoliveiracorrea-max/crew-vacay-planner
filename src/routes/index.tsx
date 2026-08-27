@@ -49,6 +49,7 @@ import {
 import { useResumoDoDia, useLotesPendentes } from "@/hooks/usePainelInicio";
 import { ehCritico, severidadeMax } from "@/lib/conflitos";
 import { fmtDataHora, humaniza, mesDe, sobrepoe, SEVERIDADE_PESO, type Severidade } from "@/lib/sistema";
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -75,6 +76,7 @@ const TODOS = "__todos__";
 
 function Painel() {
   const perfil = usePerfil();
+  const avisarErro = useAvisoErro();
   const { user } = useAuth();
   const cat = useCatalogos();
   const emp = useEmployees();
@@ -397,7 +399,7 @@ function Painel() {
       });
       toast.success(`${d.indicador}: ${total} registro(s) exportado(s) em ${formato}.`);
     } catch (e) {
-      toast.error(`Falha ao exportar: ${e instanceof Error ? e.message : "erro inesperado"}`);
+      avisarErro(e, "Não foi possível gerar a exportação. Tente novamente.");
     } finally {
       setExportando(false);
     }

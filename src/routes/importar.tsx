@@ -70,6 +70,7 @@ import {
 import { MODELOS, VERSAO_MODELO, baixarModelo } from "@/lib/modelo-importacao";
 import { humaniza, normaliza } from "@/lib/sistema";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 export const Route = createFileRoute("/importar")({
   head: () => ({
@@ -105,6 +106,7 @@ function ImportarPage() {
   const cat = useCatalogos();
   const emp = useEmployees();
   const perfil = usePerfil();
+  const avisarErro = useAvisoErro();
   const { user } = useAuth();
   const qc = useQueryClient();
 
@@ -195,7 +197,7 @@ function ImportarPage() {
     if (!catOk) return;
     const faltando = campos.filter((c) => c.obrigatorio && !mapeamento[c.key as CampoKey]);
     if (faltando.length) {
-      toast.error(`Mapeie: ${faltando.map((f) => f.label).join(", ")}`);
+      toast.error(`Revise o mapeamento: informe a coluna de ${faltando.map((f) => f.label).join(", ")}.`);
       return;
     }
     const resultadoAnalise = classificar(
@@ -350,7 +352,7 @@ function ImportarPage() {
       .select("id, nome, fonte, mapeamento")
       .single();
     if (error || !data) {
-      toast.error(error?.message ?? "Falha ao salvar o modelo.");
+      avisarErro(error, "Não foi possível salvar o modelo de mapeamento. Tente novamente.");
       return;
     }
     setModelos((m) => [
@@ -609,7 +611,7 @@ function ImportarPage() {
       setAnalisado(null);
       setDecisoes({});
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao aplicar importação.");
+      avisarErro(e, "Não foi possível processar as alterações aprovadas. Nada foi gravado. Tente novamente.");
     } finally {
       setAplicando(false);
     }
@@ -659,7 +661,7 @@ function ImportarPage() {
                       });
                       toast.success(`Modelo gerado: ${nome}`);
                     } catch (e) {
-                      toast.error(e instanceof Error ? e.message : "Falha ao gerar o modelo.");
+                      avisarErro(e, "Não foi possível gerar o modelo de importação. Tente novamente.");
                     }
                   }}
                 >

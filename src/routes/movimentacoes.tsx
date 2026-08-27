@@ -31,6 +31,7 @@ import {
   type MovementFull,
 } from "@/hooks/useSistema";
 import { fmtData, humaniza, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 const STATUS = ["PENDENTE", "APROVADA", "REJEITADA", "CANCELADA"] as const;
 const TODOS = "__todos__";
@@ -65,6 +66,7 @@ function MovimentacoesPage() {
   const mov = useMovements();
   const fer = useVacations();
   const perfil = usePerfil();
+  const avisarErro = useAvisoErro();
   const decidir = useDecidirMovimentacao();
 
   const { registro: focoId } = Route.useSearch();
@@ -329,7 +331,7 @@ function MovimentacoesPage() {
                               await decidir.mutateAsync({ id: m.id, status: "APROVADA" });
                               toast.success("Movimentação aprovada. Conflitos recalculados.");
                             } catch (e) {
-                              toast.error(e instanceof Error ? e.message : "Falha ao aprovar.");
+                              avisarErro(e, "Não foi possível aprovar a movimentação. Tente novamente.");
                             }
                           }}
                         >

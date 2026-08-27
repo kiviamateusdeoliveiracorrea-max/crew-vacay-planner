@@ -1,8 +1,10 @@
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useDiagnosticoAcesso, usePromoverPrimeiroAdmin } from "@/hooks/useAcessos";
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 export function BootstrapAdmin() {
+  const avisarErro = useAvisoErro();
   const diag = useDiagnosticoAcesso();
   const promover = usePromoverPrimeiroAdmin();
 
@@ -51,7 +53,7 @@ export function BootstrapAdmin() {
             onClick={() =>
               promover.mutate(undefined, {
                 onSuccess: () => toast.success("Você agora é o administrador do sistema."),
-                onError: (e) => toast.error((e as Error).message),
+                onError: (e) => avisarErro(e, "Não foi possível concluir a configuração. Tente novamente."),
               })
             }
           >

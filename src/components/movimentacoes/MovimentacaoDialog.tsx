@@ -24,6 +24,7 @@ import { useSalvarMovimentacao, type MovementFull } from "@/hooks/useSistema";
 import type { Area, Employee, Movement, Turno } from "@/lib/sistema";
 import { fmtData, humaniza, sobrepoe, TIPOS_MOVIMENTACAO } from "@/lib/sistema";
 import {
+import { useAvisoErro } from "@/hooks/useAvisoErro";
   ehDefinitivo,
   ehTemporario,
   lotacaoDefinitiva,
@@ -55,6 +56,7 @@ export function MovimentacaoDialog({
 }) {
   const salvar = useSalvarMovimentacao();
   const [employeeId, setEmployeeId] = useState("");
+  const avisarErro = useAvisoErro();
   const [busca, setBusca] = useState("");
   const [tipo, setTipo] = useState<Movement["tipo"]>("TRANSFERENCIA_DEFINITIVA");
   const [areaDestino, setAreaDestino] = useState("");
@@ -185,7 +187,7 @@ export function MovimentacaoDialog({
       return;
     }
     if (sobreposta) {
-      toast.error("Já existe movimentação temporária aprovada sobreposta para este colaborador.");
+      toast.error("Já existe uma movimentação para esse colaborador no período informado.");
       return;
     }
     try {
@@ -209,7 +211,7 @@ export function MovimentacaoDialog({
       toast.success("Movimentação registrada. Conflitos recalculados.");
       onOpenChange(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Não foi possível salvar.");
+      avisarErro(e, "Não foi possível salvar a movimentação. Tente novamente.");
     }
   }
 

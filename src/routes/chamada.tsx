@@ -48,6 +48,7 @@ import {
   type StatusPresenca,
 } from "@/lib/chamada";
 import { fmtData, fmtDataHora } from "@/lib/sistema";
+import { useAvisoErro } from "@/hooks/useAvisoErro";
 
 const SEM_TURNO = "__sem_turno__";
 
@@ -78,6 +79,7 @@ function hoje() {
 
 function ChamadaPage() {
   const perfil = usePerfil();
+  const avisarErro = useAvisoErro();
   const catalogos = useCatalogos();
   const employees = useEmployees();
   const movements = useMovements();
@@ -160,7 +162,7 @@ function ChamadaPage() {
 
   async function aplicarAcao(r: ChamadaRegistro, status: StatusPresenca, motivoCode?: string) {
     if (fechada) {
-      toast.error("Chamada fechada. Use a correção com justificativa.");
+      toast.error("Esta chamada já foi fechada. Para ajustar, registre uma correção com justificativa.");
       return;
     }
     if (protegido(r) && status !== r.attendance_status) {
@@ -254,11 +256,13 @@ function ChamadaPage() {
                     toast.success("Chamada aberta com a lista prevista carregada.");
                   } catch (e) {
                     const msg = (e as { message?: string }).message ?? "";
-                    toast.error(
-                      msg.includes("uq_attendance_day_ativa")
-                        ? "Já existe uma chamada ativa para esta data, unidade, área e turno."
-                        : msg || "Não foi possível abrir a chamada.",
-                    );
+                    if (msg.includes("uq_attendance_day_ativa")) {
+                      toast.error(
+                        "Já existe uma chamada aberta para esta data, unidade, área e turno.",
+                      );
+                    } else {
+                      avisarErro(e, "Não foi possível abrir a chamada. Tente novamente.");
+                    }
                   }
                 }}
               >

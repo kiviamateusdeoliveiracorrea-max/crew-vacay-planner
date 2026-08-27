@@ -20,6 +20,7 @@ import {
 } from "@/hooks/useSistema";
 import { severidadeMax } from "@/lib/conflitos";
 import {
+import { useAvisoErro } from "@/hooks/useAvisoErro";
   diasEntre,
   fmtData,
   humaniza,
@@ -57,6 +58,7 @@ function FeriasPage() {
   const fer = useVacations();
   const mov = useMovements();
   const perfil = usePerfil();
+  const avisarErro = useAvisoErro();
   const excluir = useExcluirFerias();
   const reconhecer = useReconhecerConflito();
 
@@ -213,9 +215,7 @@ function FeriasPage() {
                                 await excluir.mutateAsync(v.id);
                                 toast.success("Registro excluído.");
                               } catch (e) {
-                                toast.error(
-                                  e instanceof Error ? e.message : "Não foi possível excluir.",
-                                );
+                                avisarErro(e, "Não foi possível excluir o registro. Tente novamente.");
                               }
                             }}
                           >
