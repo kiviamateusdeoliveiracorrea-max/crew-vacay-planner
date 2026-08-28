@@ -48,13 +48,17 @@ const ferias = (o: Partial<PeriodoFerias> & { employee_id: string }): PeriodoFer
 const regras = (s: Severidade | string) => (a: { regra: string }[]) => a.some((x) => x.regra === s);
 type Severidade = string;
 
+const REF = "2026-01-15";
+const av = (b: Parameters<typeof avaliarFerias>[0], a: Parameters<typeof avaliarFerias>[1]) =>
+  avaliarFerias(b, a, REF);
+
 describe("motor de conflitos", () => {
   it("bloqueia mesma função, mesma área e mesmo turno", () => {
     const b = base({
       employees: [emp({ id: "e1", function_id: "f1" }), emp({ id: "e2", function_id: "f1" })],
       ferias: [ferias({ employee_id: "e2" })],
     });
-    const r = avaliarFerias(b, ferias({ employee_id: "e1", id: "novo" }));
+    const r = av(b, ferias({ employee_id: "e1", id: "novo" }));
     const c = r.find((x) => x.regra === "MESMA_FUNCAO_MESMA_AREA_MESMO_TURNO");
     expect(c?.severidade).toBe("BLOQUEIO");
     expect(c?.dias).toBe(10);
@@ -78,7 +82,7 @@ describe("motor de conflitos", () => {
       ferias: [ferias({ employee_id: "e2" })],
       movimentacoes: movs,
     });
-    const r = avaliarFerias(b, ferias({ employee_id: "e1", id: "novo" }));
+    const r = av(b, ferias({ employee_id: "e1", id: "novo" }));
     expect(regras("MESMA_FUNCAO_MESMA_AREA_TURNOS_DIFERENTES")(r)).toBe(true);
   });
 
@@ -93,14 +97,14 @@ describe("motor de conflitos", () => {
         { area_id: "a1", function_id: "f2", cobertura_area_id: "a2" } as unknown as CoverageRule,
       ],
     });
-    const r = avaliarFerias(b, ferias({ employee_id: "e1", id: "novo" }));
+    const r = av(b, ferias({ employee_id: "e1", id: "novo" }));
     const c = r.find((x) => x.regra === "MESMA_FUNCAO_OUTRA_AREA_COM_COBERTURA_PERMITIDA");
     expect(c?.severidade).toBe("INFORMATIVO");
   });
 
   it("aponta função-chave sem substituto", () => {
     const b = base({ employees: [emp({ id: "e1", function_id: "f1" })] });
-    const r = avaliarFerias(b, ferias({ employee_id: "e1", id: "novo" }));
+    const r = av(b, ferias({ employee_id: "e1", id: "novo" }));
     expect(regras("FUNCAO_CHAVE_SEM_SUBSTITUTO")(r)).toBe(true);
   });
 
@@ -109,7 +113,7 @@ describe("motor de conflitos", () => {
       employees: [emp({ id: "e1", function_id: "f1" }), emp({ id: "e2", function_id: "f1" })],
       ferias: [ferias({ employee_id: "e2" })],
     });
-    const r = avaliarFerias(
+    const r = av(
       b,
       ferias({ employee_id: "e1", id: "novo", substituto_employee_id: "e2" }),
     );
@@ -131,7 +135,7 @@ describe("motor de conflitos", () => {
       },
     ] as unknown as Movement[];
     const b = base({ employees: [emp({ id: "e1" })], movimentacoes: movs });
-    const r = avaliarFerias(b, ferias({ employee_id: "e1", id: "novo" }));
+    const r = av(b, ferias({ employee_id: "e1", id: "novo" }));
     expect(r.find((x) => x.regra === "MOVIMENTACAO_DURANTE_FERIAS")?.severidade).toBe("CRITICO");
   });
 
@@ -150,7 +154,7 @@ describe("motor de conflitos", () => {
       },
     ] as unknown as Movement[];
     const b = base({ employees: [emp({ id: "e1" })], movimentacoes: movs });
-    const r = avaliarFerias(b, ferias({ employee_id: "e1", id: "novo" }));
+    const r = av(b, ferias({ employee_id: "e1", id: "novo" }));
     expect(regras("MOVIMENTACAO_DURANTE_FERIAS")(r)).toBe(false);
   });
 
@@ -168,7 +172,7 @@ describe("motor de conflitos", () => {
         } as unknown as CoverageRule,
       ],
     });
-    const r = avaliarFerias(b, ferias({ employee_id: "e1", id: "novo" }));
+    const r = av(b, ferias({ employee_id: "e1", id: "novo" }));
     expect(r.find((x) => x.regra === "COBERTURA_MINIMA_NAO_ATENDIDA")?.severidade).toBe("BLOQUEIO");
   });
 
@@ -177,7 +181,7 @@ describe("motor de conflitos", () => {
       employees: [emp({ id: "e1", function_id: "f1" }), emp({ id: "e2", function_id: "f1" })],
       ferias: [ferias({ employee_id: "e2", status: "CANCELADA" })],
     });
-    const r = avaliarFerias(
+    const r = av(
       b,
       ferias({ employee_id: "e1", id: "novo", substituto_employee_id: "e2" }),
     );
