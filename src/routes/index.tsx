@@ -1,6 +1,7 @@
 import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/AppShell";
 import { UNIDADE_PADRAO } from "@/components/layout/Marca";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +51,13 @@ import {
 import { useResumoDoDia, useLotesPendentes } from "@/hooks/usePainelInicio";
 import { ehCritico, severidadeMax } from "@/lib/conflitos";
 import { fmtDataHora, humaniza, mesDe, sobrepoe, SEVERIDADE_PESO, type Severidade } from "@/lib/sistema";
+import {
+  concluidaNoAno,
+  emFeriasEm,
+  feriasAtiva,
+  hojeISO,
+  situacaoFerias,
+} from "@/lib/situacao-ferias";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -175,6 +183,28 @@ function Painel() {
 
   const resumoDia = useResumoDoDia(hoje);
   const lotes = useLotesPendentes();
+
+  const queryClient = useQueryClient();
+  const atualizadoEm = Math.max(
+    fer.dataUpdatedAt || 0,
+    mov.dataUpdatedAt || 0,
+    resumoDia.dataUpdatedAt || 0,
+    lotes.dataUpdatedAt || 0,
+  ) || Date.now();
+
+  const atualizarPainel = async () => {
+    await queryClient.invalidateQueries();
+  };
+
+  /* Recalcula automaticamente quando o dia vira, sem exigir recarregar o navegador. */
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (hojeISO() !== hoje) void queryClient.invalidateQueries();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [hoje, queryClient]);
+
+
 
   const registrosHoje = resumoDia.data?.registros ?? [];
   const presentesHoje = registrosHoje.filter((r) => r.attendance_status === "PRESENTE");
@@ -504,17 +534,42 @@ function Painel() {
 
   const blocoPlanejamento: CardIndicador[] = [
     {
-      titulo: "Férias programadas",
+      titulo: "Férias programadas ativas",
       valor: ativas.length,
-      ajuda: "Programações válidas nos filtros atuais",
+      ajuda: "Futuras e em gozo (não inclui concluídas)",
       drill: {
-        titulo: "Férias programadas",
-        indicador: "Férias programadas",
+        titulo: "Férias programadas ativas",
+        indicador: "Férias programadas ativas",
         tipo: "ferias",
         itens: ativas,
         tabela: tFerias(ativas),
       },
     },
+    {
+      titulo: "Férias futuras",
+      valor: futuras.length,
+      ajuda: "Início posterior a hoje",
+      drill: {
+        titulo: "Férias futuras",
+        indicador: "Férias futuras",
+        tipo: "ferias",
+        itens: futuras,
+        tabela: tFerias(futuras),
+      },
+    },
+    {
+      titulo: `Férias concluídas em ${anoAtual}`,
+      valor: concluidasAno.length,
+      ajuda: "Retorno já ocorrido neste ano",
+      drill: {
+        titulo: `Férias concluídas em ${anoAtual}`,
+        indicador: "Férias concluídas no ano",
+        tipo: "ferias",
+        itens: concluidasAno,
+        tabela: tFerias(concluidasAno),
+      },
+    },
+
     {
       titulo: "Férias críticas",
       valor: criticas.length,
@@ -774,7 +829,16 @@ function Painel() {
             Todos os indicadores são clicáveis e rastreáveis até o registro de origem e sua
             trilha de auditoria.
           </p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <p className="text-xs text-muted-foreground">
+              Última atualização: {fmtDataHora(new Date(atualizadoEm).toISOString())}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => void atualizarPainel()}>
+              Atualizar agora
+            </Button>
+          </div>
         </div>
+
 
         <Card>
           <CardContent className="grid gap-3 py-4 sm:grid-cols-3 lg:grid-cols-7">
