@@ -1,6 +1,7 @@
 import { useAvisoErro } from "@/hooks/useAvisoErro";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/layout/AppShell";
 import { UNIDADE_PADRAO } from "@/components/layout/Marca";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
