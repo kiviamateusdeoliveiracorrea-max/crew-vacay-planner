@@ -1,3 +1,4 @@
+import { feriasConcluida, hojeISO } from "@/lib/situacao-ferias";
 import type {
   Area,
   CoverageRule,
@@ -96,10 +97,16 @@ function coberturaPermitida(
  * Motor de conflitos: área e turno vigentes na data das férias, capacidade mínima,
  * substitutos e movimentações. Espelha as regras aplicadas no banco.
  */
-export function avaliarFerias(base: BaseMotor, alvo: PeriodoFerias): Alerta[] {
+export function avaliarFerias(
+  base: BaseMotor,
+  alvo: PeriodoFerias,
+  hoje: string = hojeISO(),
+): Alerta[] {
   const alertas: Alerta[] = [];
   if (!alvo.employee_id || !alvo.inicio || !alvo.fim) return alertas;
   if (alvo.status === "CANCELADA") return alertas;
+  // Períodos já encerrados (retorno <= hoje) não geram novos conflitos.
+  if (feriasConcluida(alvo, hoje)) return alertas;
 
   const emp = base.employees.find((e) => e.id === alvo.employee_id);
   if (!emp) return alertas;
@@ -129,6 +136,7 @@ export function avaliarFerias(base: BaseMotor, alvo: PeriodoFerias): Alerta[] {
   const outras = base.ferias.filter(
     (v) =>
       v.status !== "CANCELADA" &&
+      !feriasConcluida(v, hoje) &&
       (alvo.id ? v.id !== alvo.id : true) &&
       sobrepoe(v, { inicio: alvo.inicio, fim: alvo.fim }),
   );
@@ -267,6 +275,7 @@ export function avaliarFerias(base: BaseMotor, alvo: PeriodoFerias): Alerta[] {
         .filter(
           (v) =>
             v.status !== "CANCELADA" &&
+            !feriasConcluida(v, hoje) &&
             idsAtivos.has(v.employee_id) &&
             sobrepoe(v, { inicio: alvo.inicio, fim: alvo.fim }),
         )
