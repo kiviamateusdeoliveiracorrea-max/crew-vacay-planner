@@ -1,3 +1,4 @@
+import { emFeriasEm } from "@/lib/situacao-ferias";
 import type { Enums, Tables } from "@/integrations/supabase/types";
 import type { Employee, Movement, Vacation } from "@/lib/sistema";
 import { lotacaoDefinitiva, lotacaoVigente } from "@/lib/movimentacao";
@@ -165,11 +166,7 @@ export function montarPrevistos(
 
   const feriasVigentes = (employeeId: string) =>
     base.ferias.filter(
-      (v) =>
-        v.employee_id === employeeId &&
-        v.status !== "CANCELADA" &&
-        v.inicio <= data &&
-        v.fim >= data,
+      (v) => v.employee_id === employeeId && emFeriasEm(v, data),
     );
 
   const temporariasVigentes = (employeeId: string) =>
