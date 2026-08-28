@@ -22,6 +22,20 @@ import {
 } from "@/hooks/useSistema";
 import { severidadeMax } from "@/lib/conflitos";
 import {
+  SITUACAO_LABEL,
+  feriasAtiva,
+  hojeISO,
+  situacaoFerias,
+  type SituacaoFerias,
+} from "@/lib/situacao-ferias";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   diasEntre,
   fmtData,
   severidadeClasse,
@@ -66,6 +80,8 @@ function FeriasPage() {
   const navigate = Route.useNavigate();
 
   const [aba, setAba] = useState("__todas__");
+  const [situacao, setSituacao] = useState<"ATIVAS" | "TODAS" | SituacaoFerias>("ATIVAS");
+  const hoje = hojeISO();
   const [busca, setBusca] = useState("");
   const [aberto, setAberto] = useState(false);
   const [editando, setEditando] = useState<VacationFull | null>(null);
@@ -86,6 +102,9 @@ function FeriasPage() {
     const termo = busca.trim().toLowerCase();
     return (fer.data ?? []).filter((v) => {
       if (focoId) return v.id === focoId;
+      if (situacao === "ATIVAS" && !feriasAtiva(v, hoje)) return false;
+      if (situacao !== "ATIVAS" && situacao !== "TODAS" && situacaoFerias(v, hoje) !== situacao)
+        return false;
       const area = v.area_id_snapshot ?? v.employee?.area_id ?? null;
       if (aba !== "__todas__" && area !== aba) return false;
       if (!termo) return true;
@@ -94,7 +113,7 @@ function FeriasPage() {
         (v.employee?.re ?? "").includes(termo)
       );
     });
-  }, [fer.data, aba, busca, focoId]);
+  }, [fer.data, aba, busca, focoId, situacao, hoje]);
 
   return (
     <AppShell>
@@ -140,6 +159,24 @@ function FeriasPage() {
             onChange={(e) => setBusca(e.target.value)}
             className="max-w-xs"
           />
+          <Select value={situacao} onValueChange={(v) => setSituacao(v as typeof situacao)}>
+            <SelectTrigger className="w-[220px]" aria-label="Situação das férias">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ATIVAS">Ativas (futuras e em gozo)</SelectItem>
+              <SelectItem value="TODAS">Todas</SelectItem>
+              <SelectItem value="PROGRAMADA">Futuras</SelectItem>
+              <SelectItem value="EM_GOZO">Em gozo</SelectItem>
+              <SelectItem value="CONCLUIDA">Concluídas</SelectItem>
+              <SelectItem value="CANCELADA">Canceladas</SelectItem>
+              <SelectItem value="PENDENTE_DE_VALIDACAO">Pendentes de validação</SelectItem>
+              <SelectItem value="ERRO_DE_DATA">Erro de data</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" onClick={() => setSituacao("CONCLUIDA")}>
+            Ver histórico de férias
+          </Button>
           <Tabs value={aba} onValueChange={setAba} className="flex-1">
             <TabsList className="flex h-auto flex-wrap justify-start">
               <TabsTrigger value="__todas__">Todas</TabsTrigger>
@@ -187,6 +224,9 @@ function FeriasPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="text-[10px]">
+                          {SITUACAO_LABEL[situacaoFerias(v, hoje)]}
+                        </Badge>
+                        <Badge variant="secondary" className="text-[10px]">
                           {rotularCodigo(v.status)}
                         </Badge>
                         {sev && (
