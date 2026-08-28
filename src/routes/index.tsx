@@ -50,6 +50,13 @@ import {
 import { useResumoDoDia, useLotesPendentes } from "@/hooks/usePainelInicio";
 import { ehCritico, severidadeMax } from "@/lib/conflitos";
 import { fmtDataHora, humaniza, mesDe, sobrepoe, SEVERIDADE_PESO, type Severidade } from "@/lib/sistema";
+import {
+  concluidaNoAno,
+  emFeriasEm,
+  feriasAtiva,
+  hojeISO,
+  situacaoFerias,
+} from "@/lib/situacao-ferias";
 
 export const Route = createFileRoute("/")({
   head: () => ({
