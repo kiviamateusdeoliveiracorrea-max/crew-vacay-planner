@@ -806,7 +806,16 @@ function Painel() {
             Todos os indicadores são clicáveis e rastreáveis até o registro de origem e sua
             trilha de auditoria.
           </p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <p className="text-xs text-muted-foreground">
+              Última atualização: {fmtDataHora(new Date(atualizadoEm).toISOString())}
+            </p>
+            <Button size="sm" variant="outline" onClick={() => void atualizarPainel()}>
+              Atualizar agora
+            </Button>
+          </div>
         </div>
+
 
         <Card>
           <CardContent className="grid gap-3 py-4 sm:grid-cols-3 lg:grid-cols-7">
