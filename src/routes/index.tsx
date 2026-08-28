@@ -183,6 +183,28 @@ function Painel() {
   const resumoDia = useResumoDoDia(hoje);
   const lotes = useLotesPendentes();
 
+  const queryClient = useQueryClient();
+  const atualizadoEm = Math.max(
+    fer.dataUpdatedAt || 0,
+    mov.dataUpdatedAt || 0,
+    resumoDia.dataUpdatedAt || 0,
+    lotes.dataUpdatedAt || 0,
+  ) || Date.now();
+
+  const atualizarPainel = async () => {
+    await queryClient.invalidateQueries();
+  };
+
+  /* Recalcula automaticamente quando o dia vira, sem exigir recarregar o navegador. */
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (hojeISO() !== hoje) void queryClient.invalidateQueries();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [hoje, queryClient]);
+
+
+
   const registrosHoje = resumoDia.data?.registros ?? [];
   const presentesHoje = registrosHoje.filter((r) => r.attendance_status === "PRESENTE");
   const ausentesHoje = registrosHoje.filter((r) =>
