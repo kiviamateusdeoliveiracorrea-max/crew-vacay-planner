@@ -511,17 +511,42 @@ function Painel() {
 
   const blocoPlanejamento: CardIndicador[] = [
     {
-      titulo: "Férias programadas",
+      titulo: "Férias programadas ativas",
       valor: ativas.length,
-      ajuda: "Programações válidas nos filtros atuais",
+      ajuda: "Futuras e em gozo (não inclui concluídas)",
       drill: {
-        titulo: "Férias programadas",
-        indicador: "Férias programadas",
+        titulo: "Férias programadas ativas",
+        indicador: "Férias programadas ativas",
         tipo: "ferias",
         itens: ativas,
         tabela: tFerias(ativas),
       },
     },
+    {
+      titulo: "Férias futuras",
+      valor: futuras.length,
+      ajuda: "Início posterior a hoje",
+      drill: {
+        titulo: "Férias futuras",
+        indicador: "Férias futuras",
+        tipo: "ferias",
+        itens: futuras,
+        tabela: tFerias(futuras),
+      },
+    },
+    {
+      titulo: `Férias concluídas em ${anoAtual}`,
+      valor: concluidasAno.length,
+      ajuda: "Retorno já ocorrido neste ano",
+      drill: {
+        titulo: `Férias concluídas em ${anoAtual}`,
+        indicador: "Férias concluídas no ano",
+        tipo: "ferias",
+        itens: concluidasAno,
+        tabela: tFerias(concluidasAno),
+      },
+    },
+
     {
       titulo: "Férias críticas",
       valor: criticas.length,
