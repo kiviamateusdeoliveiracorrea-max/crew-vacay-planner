@@ -459,6 +459,16 @@ function ImportarPage() {
         conta[k] = (conta[k] ?? 0) + 1;
       };
 
+      const fecharVagaSeExistir = async (codigo: string | undefined) => {
+        if (!codigo) return;
+        const { error } = await supabase
+          .from("job_openings")
+          .update({ status: "PREENCHIDA", updated_by: user?.id ?? null })
+          .eq("codigo", codigo)
+          .eq("status", "ABERTA");
+        if (error) throw error;
+      };
+
       for (const l of analisado) {
         // Guarda final: linha inválida ou bloqueada nunca é gravada, mesmo marcada como aprovada.
         if (!linhaProcessavel(l)) continue;
