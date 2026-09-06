@@ -336,7 +336,7 @@ export function classificar(
 
     const avisos: string[] = [];
     const conhecido = (valor: string, mapa: Map<string, string>) =>
-      !valor || [...mapa.values()].includes(normaliza(valor));
+      !valor || [...mapa.values()].some((v) => normaliza(v) === normaliza(valor));
     if (!conhecido(dados["area"] ?? "", nomeArea))
       avisos.push(`Setor "${dados["area"]}" não existe no cadastro — será criado ao aprovar.`);
     if (!conhecido(dados["turno"] ?? "", nomeTurno))
