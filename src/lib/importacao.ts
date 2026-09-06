@@ -302,8 +302,12 @@ export function classificar(
   const nomeTurno = new Map(turnos.map((t) => [t.id, t.nome]));
   const nomeFuncao = new Map(funcoes.map((f) => [f.id, f.nome]));
 
-  const chaveDe = (bruta: Record<string, string>) =>
-    normaliza(asTexto(bruta[mapeamento["re"] ?? ""]));
+  const RE_PLACEHOLDER = new Set(["-", "N/A", "NA", "S/N", "SEM RE"]);
+  const chaveDe = (bruta: Record<string, string>) => {
+    const valor = normaliza(asTexto(bruta[mapeamento["re"] ?? ""]));
+    return RE_PLACEHOLDER.has(valor) ? "" : valor;
+  };
+
   const contagem = new Map<string, number>();
   for (const b of linhas) {
     const c = chaveDe(b);
