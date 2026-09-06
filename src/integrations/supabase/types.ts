@@ -722,6 +722,7 @@ export type Database = {
           unidade: string
           updated_at: string
           updated_by: string | null
+          vaga_id: string | null
         }
         Insert: {
           area_id?: string | null
@@ -740,6 +741,7 @@ export type Database = {
           unidade?: string
           updated_at?: string
           updated_by?: string | null
+          vaga_id?: string | null
         }
         Update: {
           area_id?: string | null
@@ -758,6 +760,7 @@ export type Database = {
           unidade?: string
           updated_at?: string
           updated_by?: string | null
+          vaga_id?: string | null
         }
         Relationships: [
           {
