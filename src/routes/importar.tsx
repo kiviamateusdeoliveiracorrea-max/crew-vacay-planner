@@ -459,6 +459,16 @@ function ImportarPage() {
         conta[k] = (conta[k] ?? 0) + 1;
       };
 
+      const fecharVagaSeExistir = async (codigo: string | undefined) => {
+        if (!codigo) return;
+        const { error } = await supabase
+          .from("job_openings")
+          .update({ status: "PREENCHIDA", updated_by: user?.id ?? null })
+          .eq("codigo", codigo)
+          .eq("status", "ABERTA");
+        if (error) throw error;
+      };
+
       for (const l of analisado) {
         // Guarda final: linha inválida ou bloqueada nunca é gravada, mesmo marcada como aprovada.
         if (!linhaProcessavel(l)) continue;
@@ -468,15 +478,28 @@ function ImportarPage() {
         const funcaoId = await garantir("functions", funcoes, d["funcao"] ?? "");
 
         if (l.classificacao === "VAGA_ABERTA") {
-          const { error } = await supabase.from("job_openings").insert({
-            codigo: d["vaga_id"] || `VAGA-${batch.id.slice(0, 8)}-${l.linha}`,
+          const codigo = d["vaga_id"] || `VAGA-${batch.id.slice(0, 8)}-${l.linha}`;
+          const { data: existente, error: erroBusca } = await supabase
+            .from("job_openings")
+            .select("id")
+            .eq("codigo", codigo)
+            .eq("status", "ABERTA")
+            .maybeSingle();
+          if (erroBusca) throw erroBusca;
+          const payload = {
+            codigo,
             area_id: areaId,
             shift_id: turnoId,
             function_id: funcaoId,
             status: "ABERTA",
             observacao: d["observacoes"] || `Importação ${arquivo?.nome ?? ""}`,
-            created_by: user?.id ?? null,
-          });
+            updated_by: user?.id ?? null,
+          };
+          const { error } = existente
+            ? await supabase.from("job_openings").update(payload).eq("id", existente.id)
+            : await supabase
+                .from("job_openings")
+                .insert({ ...payload, created_by: user?.id ?? null });
           if (error) throw error;
           soma("VAGA_ABERTA");
           continue;
@@ -492,6 +515,7 @@ function ImportarPage() {
             function_id: funcaoId,
             lider: d["lider"] || null,
             data_admissao: toISO(d["data_admissao"] ?? ""),
+            vaga_id: d["vaga_id"] || null,
           };
           if (d["unidade"]) novo.unidade = d["unidade"];
           const { data: criado, error } = await supabase
@@ -500,6 +524,7 @@ function ImportarPage() {
             .select("id")
             .single();
           if (error) throw error;
+          await fecharVagaSeExistir(d["vaga_id"]);
           await supabase.from("approvals").insert({
             entidade: "employees",
             entidade_id: criado.id,
@@ -614,8 +639,10 @@ function ImportarPage() {
           if (l.classificacao === "MUDANCA_DE_TURNO") patch["shift_id"] = turnoId;
           if (l.classificacao === "MUDANCA_DE_FUNCAO") patch["function_id"] = funcaoId;
           if (d["lider"]) patch["lider"] = d["lider"];
+          if (d["vaga_id"]) patch["vaga_id"] = d["vaga_id"];
           const { error } = await supabase.from("employees").update(patch).eq("id", l.employee_id);
           if (error) throw error;
+          if (d["vaga_id"]) await fecharVagaSeExistir(d["vaga_id"]);
           soma(l.classificacao);
         }
       }
