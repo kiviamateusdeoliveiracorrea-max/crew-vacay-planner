@@ -298,9 +298,9 @@ export function classificar(
 ): LinhaImportada[] {
   const campos = camposDaFonte(fonte);
   const porRe = new Map(employees.filter((e) => e.re).map((e) => [normaliza(e.re!), e]));
-  const nomeArea = new Map(areas.map((a) => [a.id, normaliza(a.nome)]));
-  const nomeTurno = new Map(turnos.map((t) => [t.id, normaliza(t.nome)]));
-  const nomeFuncao = new Map(funcoes.map((f) => [f.id, normaliza(f.nome)]));
+  const nomeArea = new Map(areas.map((a) => [a.id, a.nome]));
+  const nomeTurno = new Map(turnos.map((t) => [t.id, t.nome]));
+  const nomeFuncao = new Map(funcoes.map((f) => [f.id, f.nome]));
 
   const chaveDe = (bruta: Record<string, string>) =>
     normaliza(asTexto(bruta[mapeamento["re"] ?? ""]));
