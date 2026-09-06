@@ -99,5 +99,7 @@ export const normaliza = (v: string) =>
   v
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
     .trim()
-    .toUpperCase();
+    .replace(/\s+/g, " ");
