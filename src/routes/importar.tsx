@@ -173,12 +173,29 @@ function ImportarPage() {
     lerAba(wb, primeira, fonte);
   }
 
+  function detectarLinhaCabecalho(sheet: XLSX.WorkSheet, maxLinhas = 15): number {
+    const grade = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+      header: 1,
+      defval: "",
+      raw: false,
+    });
+    for (let i = 0; i < Math.min(grade.length, maxLinhas); i++) {
+      const linha = grade[i] ?? [];
+      const preenchidas = linha.filter((v) => String(v ?? "").trim() !== "").length;
+      // primeira linha com pelo menos 3 células preenchidas = cabeçalho real
+      if (preenchidas >= 3) return i;
+    }
+    return 0; // nada encontrado: mantém o comportamento antigo
+  }
+
   function lerAba(wb: XLSX.WorkBook, nome: string, f: FonteKey) {
     const sheet = wb.Sheets[nome];
     if (!sheet) return;
+    const linhaCabecalho = detectarLinhaCabecalho(sheet);
     const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
       defval: "",
       raw: false,
+      range: linhaCabecalho,
     });
     const cols = Object.keys(json[0] ?? {});
     const bloqueadas = detectarCamposSensiveis(cols);
@@ -190,6 +207,11 @@ function ImportarPage() {
       ),
     );
     setMapeamento(autoMapear(cols, f));
+    if (linhaCabecalho > 0) {
+      toast.info(
+        `Cabeçalho detectado na linha ${linhaCabecalho + 1} da planilha (linhas anteriores ignoradas como título/espaço).`,
+      );
+    }
   }
 
   const catOk = cat.data && emp.data;
